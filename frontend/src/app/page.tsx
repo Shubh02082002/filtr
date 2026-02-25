@@ -270,7 +270,9 @@ export default function Home() {
               ) : (
                 <><Zap size={18} /> Analyse My Data</>
               )}
-            </button>{uploading && (
+            </button>
+              <p className="text-center text-gray-500 text-xs mt-2">First load may take 30 seconds while the server wakes up.</p>
+              {uploading && (
               <p className="text-center text-gray-500 text-sm mt-3">
                 Embedding and indexing â€” this takes 20-60 seconds depending on file size
               </p>
@@ -386,6 +388,7 @@ export default function Home() {
     </div>
   )
 }
+
 
 
 
