@@ -1,4 +1,4 @@
-import os
+﻿import os
 import uuid
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,7 +16,7 @@ from llm import generate_answer
 
 app = FastAPI(title="PM Signal API", version="1.0.0")
 
-# CORS — allow Next.js frontend
+# CORS â€” allow Next.js frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # tighten in production
@@ -26,14 +26,14 @@ app.add_middleware(
 )
 
 
-# ── Health check ──────────────────────────────────────────────────────────────
+# â”€â”€ Health check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
 
-# ── Ingest endpoint ───────────────────────────────────────────────────────────
+# â”€â”€ Ingest endpoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.post("/ingest")
 async def ingest(
@@ -63,7 +63,7 @@ async def ingest(
         if ext == "json":
             chunks = parse_slack(content)
         elif ext == "csv":
-            chunks = parse_jira(content)
+            chunks = parse_jira(content.decode("utf-8", errors="ignore"))
         elif ext in ("pdf", "txt"):
             chunks = parse_transcript(content, filename)
         else:
@@ -85,7 +85,7 @@ async def ingest(
     }
 
 
-# ── Query endpoint ────────────────────────────────────────────────────────────
+# â”€â”€ Query endpoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class QueryRequest(BaseModel):
     query: str
@@ -112,3 +112,4 @@ async def query(req: QueryRequest):
         "sources": chunks,
         "query": req.query,
     }
+
