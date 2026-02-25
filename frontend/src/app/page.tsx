@@ -72,8 +72,7 @@ function SourceCard({ source, index }: { source: Source; index: number }) {
           className="mt-1 text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
         >
           {expanded ? <><ChevronUp size={12} /> Show less</> : <><ChevronDown size={12} /> Show more</>}
-        </button>
-      )}
+        </button>)}
     </div>
   )
 }
@@ -187,8 +186,7 @@ export default function Home() {
               className="text-sm text-gray-400 hover:text-white transition-colors"
             >
               â† Upload new files
-            </button>
-          )}
+            </button>)}
         </div>
       </header>
 
@@ -244,8 +242,7 @@ export default function Home() {
                     </div>
                     <button onClick={() => removeFile(i)} className="text-gray-600 hover:text-red-400 transition-colors">
                       <X size={14} />
-                    </button>
-                  </div>
+                    </button></div>
                 ))}
               </div>
             )}
@@ -253,9 +250,7 @@ export default function Home() {
             {/* Mock data note */}
             <p className="text-center text-gray-600 text-sm mt-4">
               No data? Try with our{' '}
-              <a href="/mock_data" className="text-indigo-400 hover:text-indigo-300 underline">
-                mock dataset
-              </a>{' '}
+              mock dataset{' '}
               (Slack + Jira + transcript included)
             </p>
 
@@ -275,9 +270,7 @@ export default function Home() {
               ) : (
                 <><Zap size={18} /> Analyse My Data</>
               )}
-            </button>
-
-            {uploading && (
+            </button>{uploading && (
               <p className="text-center text-gray-500 text-sm mt-3">
                 Embedding and indexing â€” this takes 20-60 seconds depending on file size
               </p>
@@ -320,8 +313,7 @@ export default function Home() {
                 >
                   {querying ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
                   Ask
-                </button>
-              </div>
+                </button></div>
 
               {/* Sample queries */}
               <div className="mt-3 flex flex-wrap gap-2">
@@ -332,8 +324,7 @@ export default function Home() {
                     className="text-xs text-gray-400 hover:text-indigo-300 bg-[#141720] border border-[#2a2d3d] hover:border-indigo-800/50 rounded-full px-3 py-1.5 transition-colors"
                   >
                     {q}
-                  </button>
-                ))}
+                  </button>))}
               </div>
             </div>
 
@@ -374,8 +365,7 @@ export default function Home() {
                   >
                     {showSources ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                     Source chunks ({result.sources.length})
-                  </button>
-                  {showSources && (
+                  </button>{showSources && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {result.sources.map((source, i) => (
                         <SourceCard key={i} source={source} index={i} />
@@ -396,4 +386,7 @@ export default function Home() {
     </div>
   )
 }
+
+
+
 
