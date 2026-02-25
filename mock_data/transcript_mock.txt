@@ -1,0 +1,50 @@
+Customer Discovery Call Transcript
+Date: February 5, 2024
+Participant: Sarah Chen, Head of Operations at Meridian Logistics
+Interviewer: PM Team
+
+---
+
+PM: Thanks for joining us Sarah. Can you walk me through how your team is using the product day to day?
+
+Sarah: Sure. So we have about 35 people using it across our ops team. The main use case is project tracking — we use it to manage our shipment coordination workflows.
+
+PM: And what's working well?
+
+Sarah: Honestly, the core project tracking is solid. When it works, it works. The timeline view has been really useful for our weekly planning.
+
+PM: What's not working well?
+
+Sarah: Where do I start. The biggest issue right now — and this is causing us real pain — is the payment thing. Two of my team leads tried to upgrade their seats last week and they both hit an error on the checkout page. I had to go in manually and do it through your sales team. That's a terrible experience.
+
+PM: I'm sorry to hear that. Was this on mobile or desktop?
+
+Sarah: Both actually. One was on her iPhone, one was on a laptop. So it doesn't seem device-specific.
+
+PM: Got it. What else?
+
+Sarah: The onboarding. We just hired six new people and getting them set up was a nightmare. The onboarding checklist doesn't save your progress — I watched one of my new hires do the whole thing, close her laptop to go to lunch, come back and it was completely reset. She had to start from scratch. That's just a basic thing that should work.
+
+PM: That's really helpful. Did she give up?
+
+Sarah: She didn't, but she was frustrated. And she's technical. Our less technical team members — I'm honestly worried they're going to drop off before they get set up.
+
+PM: What about collaboration features? Inviting team members?
+
+Sarah: Oh god. Finding the invite button took me like ten minutes the first time. It's buried somewhere in settings. I actually had to Google it. For a product that's supposed to be collaborative, the invite flow is really poorly designed.
+
+PM: Noted. Any feature gaps that are blocking you?
+
+Sarah: The CSV export. I've asked about this three times now. Our finance team needs to pull data for monthly reporting and right now they have to screenshot tables or manually copy data into Excel. It's a huge time sink. We would pay extra for this feature honestly.
+
+PM: Anything else?
+
+Sarah: The search. If I search for something and I don't spell it exactly right, I get nothing. Last week I searched for 'reciept' — spelled it wrong, I know — and got zero results even though we have dozens of receipts in there. Just basic fuzzy matching would solve this.
+
+PM: That's super useful. One last thing — how are you feeling about the product overall? Would you recommend it?
+
+Sarah: I would, but with caveats. The core is good but these paper cuts are real. The payment bug is the most urgent — if I can't easily add seats, that's a growth blocker for you guys too. And the onboarding issues mean our new hires are starting on a bad foot. Fix those two things and I'd be a lot more enthusiastic.
+
+---
+
+End of transcript.
