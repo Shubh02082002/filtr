@@ -1,0 +1,5 @@
+﻿content = open('src/app/page.tsx', 'r', encoding='utf-8', errors='ignore').read()
+content = content.replace('href="/mock_data/slack_export_mock.json"', 'href="/mock_data/slack_export_mock.json" download="slack_export_mock.json"')
+content = content.replace('href="/mock_data/transcript_mock.txt"', 'href="/mock_data/transcript_mock.txt" download="transcript_mock.txt"')
+open('src/app/page.tsx', 'w', encoding='utf-8').write(content)
+print('done')

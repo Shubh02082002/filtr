@@ -250,7 +250,7 @@ export default function Home() {
             {/* Mock data note */}
             <p className="text-center text-gray-600 text-sm mt-4">
               No data? Try with our{' '}
-              <a href="/mock_data/slack_export_mock.json" className="text-indigo-400 hover:text-indigo-300 underline">Slack</a>, <a href="/mock_data/jira_export_mock.csv" className="text-indigo-400 hover:text-indigo-300 underline">Jira</a>, <a href="/mock_data/transcript_mock.txt" className="text-indigo-400 hover:text-indigo-300 underline">Transcript</a>{' '}
+              <a href="/mock_data/slack_export_mock.json" download="slack_export_mock.json" className="text-indigo-400 hover:text-indigo-300 underline">Slack</a>, <a href="/mock_data/jira_export_mock.csv" className="text-indigo-400 hover:text-indigo-300 underline">Jira</a>, <a href="/mock_data/transcript_mock.txt" download="transcript_mock.txt" className="text-indigo-400 hover:text-indigo-300 underline">Transcript</a>{' '}
               (Slack + Jira + transcript included)
             </p>
 
