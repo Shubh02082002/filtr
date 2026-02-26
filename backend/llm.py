@@ -56,7 +56,7 @@ Answer:"""
         response = requests.post(url, json=payload)
 
         if response.status_code == 429:
-            wait = 15 * (attempt + 1)  # 15s, 30s, 45s, 60s
+            wait = 10 * (attempt + 1)  # 15s, 30s, 45s, 60s
             print(f"[llm] 429 rate limit hit, waiting {wait}s before retry {attempt + 1}/4...")
             time.sleep(wait)
             continue
