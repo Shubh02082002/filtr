@@ -196,6 +196,48 @@ function MilestoneBar({ stageIndex, fillPct }: { stageIndex: number; fillPct: nu
   )
 }
 
+// ── Sticky Bottom Feedback Bar ──
+function BottomFeedbackBar() {
+  const [dismissed, setDismissed] = useState(false)
+
+  if (dismissed) return null
+
+  return (
+    <div
+      className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-3 border-t border-[#2a2d3d]"
+      style={{ background: 'rgba(20, 23, 32, 0.95)', backdropFilter: 'blur(12px)' }}
+    >
+      <span className="text-sm text-gray-400">Did Filtr save you time today?</span>
+      <div className="flex items-center gap-3">
+        <a
+          href={FEEDBACK_FORM_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => setDismissed(true)}
+          className="text-sm font-medium px-4 py-1.5 rounded-lg bg-emerald-700/30 text-emerald-400 border border-emerald-700/50 hover:bg-emerald-700/50 transition-colors"
+        >
+          Yes, it did
+        </a>
+        <a
+          href={FEEDBACK_FORM_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => setDismissed(true)}
+          className="text-sm font-medium px-4 py-1.5 rounded-lg bg-[#1e2130] text-gray-400 border border-[#2a2d3d] hover:border-[#3a3f55] hover:text-gray-300 transition-colors"
+        >
+          Not really
+        </a>
+        <button
+          onClick={() => setDismissed(true)}
+          className="text-gray-600 hover:text-gray-400 transition-colors ml-1"
+        >
+          <X size={14} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function Home() {
   const [step, setStep] = useState<'upload' | 'loading' | 'query'>('upload')
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -374,16 +416,17 @@ export default function Home() {
             <span className="font-semibold text-white text-lg">Filtr</span>
             <span className="text-xs bg-indigo-900/50 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-800/50 ml-1">Beta</span>
           </div>
+
           {step === 'query' && (
-            <div className="flex items-center gap-4">
-              {/* Feedback link in header — small, always visible */}
+            <div className="flex items-center gap-3">
+              {/* Share Feedback pill — clean, no long text */}
               <a
                 href={FEEDBACK_FORM_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-gray-600 hover:text-indigo-400 transition-colors hidden sm:inline-flex items-center gap-1"
+                className="text-xs font-medium px-3 py-1.5 rounded-full border border-indigo-700/60 text-indigo-400 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all"
               >
-                ⚡ Did this save you time? →
+                Share Feedback
               </a>
               <button
                 onClick={() => {
@@ -404,7 +447,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-12">
+      <main className="max-w-5xl mx-auto px-6 py-12 pb-20">
 
         {/* ── UPLOAD STEP ── */}
         {step === 'upload' && (
@@ -538,27 +581,9 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Cluster cards */}
+            {/* Cluster cards — NO feedback banner above, clean */}
             {insights.length > 0 && (
               <div className="mb-8">
-
-                {/* Feedback banner — above cluster header, small and subtle */}
-                <a
-                  href={FEEDBACK_FORM_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between w-full border border-indigo-900/40 rounded-lg px-4 py-2 mb-4 hover:border-indigo-700/50 transition-colors group"
-                  style={{ background: 'rgba(99,102,241,0.04)' }}
-                >
-                  <span className="text-xs text-indigo-400/70 group-hover:text-indigo-300 transition-colors">
-                    ⚡ Did this save you time today? Tell us honestly
-                  </span>
-                  <span className="text-xs text-gray-600 group-hover:text-indigo-400 transition-colors">
-                    2 min feedback →
-                  </span>
-                </a>
-
-                {/* Cluster section header */}
                 <div className="flex items-center gap-2 mb-4">
                   <Zap size={14} className="text-indigo-400" />
                   <h2 className="text-sm font-semibold text-indigo-400 uppercase tracking-wide">Top Issues This Period</h2>
@@ -662,6 +687,10 @@ export default function Home() {
       <footer className="border-t border-[#1e2130] mt-20 py-6 text-center text-xs text-gray-700">
         Filtr · Files processed in-memory and not stored after indexing · Built with Gemini + Pinecone
       </footer>
+
+      {/* Sticky bottom feedback bar — only on query step */}
+      {step === 'query' && <BottomFeedbackBar />}
+
     </div>
   )
 }
