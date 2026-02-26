@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 from typing import List, Dict
 
@@ -13,6 +14,7 @@ If the context does not contain enough information to answer, say so clearly."""
 def generate_answer(query: str, chunks: List[Dict]) -> str:
     """
     Build a prompt from retrieved chunks and generate an answer using Gemini Flash via REST.
+    Includes retry logic for 429 rate limit errors.
     """
     if not chunks:
         return "No relevant context found in your uploaded files for this query. Try rephrasing or uploading more data."
@@ -49,8 +51,18 @@ Answer:"""
         }
     }
 
-    response = requests.post(url, json=payload)
-    response.raise_for_status()
+    # Retry up to 4 times on 429 rate limit
+    for attempt in range(4):
+        response = requests.post(url, json=payload)
 
-    data = response.json()
-    return data["candidates"][0]["content"]["parts"][0]["text"]
+        if response.status_code == 429:
+            wait = 15 * (attempt + 1)  # 15s, 30s, 45s, 60s
+            print(f"[llm] 429 rate limit hit, waiting {wait}s before retry {attempt + 1}/4...")
+            time.sleep(wait)
+            continue
+
+        response.raise_for_status()
+        data = response.json()
+        return data["candidates"][0]["content"]["parts"][0]["text"]
+
+    raise Exception("Gemini rate limit exceeded after 4 retries. Please wait a moment and try again.")
