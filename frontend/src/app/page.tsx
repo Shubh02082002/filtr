@@ -185,6 +185,10 @@ export default function Home() {
     files.forEach(f => formData.append('files', f))
 
     try {
+      // Wake up Render before uploading
+      await fetch(`${API_BASE}/health`).catch(() => {})
+      await new Promise(resolve => setTimeout(resolve, 3000))
+
       const res = await fetch(`${API_BASE}/ingest`, { method: 'POST', body: formData })
       if (!res.ok) {
         const err = await res.json()
