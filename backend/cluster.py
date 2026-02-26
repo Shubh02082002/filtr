@@ -1,14 +1,17 @@
 import os
 import re
 import json
+import time
 import numpy as np
 import requests
 from sklearn.cluster import KMeans
 from typing import List, Dict
 from vector_store import fetch_session_vectors
 
+
 def get_api_key():
     return os.environ["GEMINI_API_KEY"]
+
 
 def name_clusters_with_llm(cluster_excerpts: List[List[str]]) -> List[str]:
     api_key = get_api_key()
@@ -26,20 +29,27 @@ def name_clusters_with_llm(cluster_excerpts: List[List[str]]) -> List[str]:
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1024}
     }
-    response = requests.post(url, json=payload)
-    response.raise_for_status()
-    raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
 
-    # Robust extraction: find the JSON array regardless of surrounding text or markdown
-    match = re.search(r'\[.*?\]', raw, re.DOTALL)
-    if not match:
-        raise ValueError(f"No JSON array found in LLM response: {repr(raw)}")
-    names = json.loads(match.group())
+    for attempt in range(3):
+        response = requests.post(url, json=payload)
+        if response.status_code == 429:
+            wait = 30 * (attempt + 1)
+            time.sleep(wait)
+            continue
+        response.raise_for_status()
+        raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+        match = re.search(r'\[.*?\]', raw, re.DOTALL)
+        if not match:
+            raise ValueError(f"No JSON array found in LLM response: {repr(raw)}")
+        names = json.loads(match.group())
+        n = len(cluster_excerpts)
+        names = (names + [f"Theme {i+1}" for i in range(n)])[:n]
+        return names
 
-    # Pad with fallbacks if LLM returned fewer names than clusters
+    # All retries exhausted - return fallback names
     n = len(cluster_excerpts)
-    names = (names + [f"Theme {i+1}" for i in range(n)])[:n]
-    return names
+    return [f"Theme {i+1}" for i in range(n)]
+
 
 def run_clustering(session_id: str, n_clusters: int = 5) -> List[Dict]:
     vectors = fetch_session_vectors(session_id)
