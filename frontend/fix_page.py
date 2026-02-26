@@ -1,4 +1,4 @@
-'use client'
+content = r"""'use client'
 
 import { useState, useRef, useCallback } from 'react'
 import { Upload, Search, FileText, MessageSquare, Layers, ChevronDown, ChevronUp, Loader2, CheckCircle, AlertCircle, X, Zap, ThumbsUp, ThumbsDown } from 'lucide-react'
@@ -195,7 +195,6 @@ export default function Home() {
       setUploadResults(data.files)
       setStep('query')
 
-      // Auto-fetch insights — capture session_id explicitly to avoid stale closure
       const sid = data.session_id
       setInsightsLoading(true)
       setInsights([])
@@ -250,7 +249,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#0f1117]">
-      {/* Header */}
       <header className="border-b border-[#1e2130] bg-[#0f1117]/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -273,7 +271,6 @@ export default function Home() {
 
       <main className="max-w-5xl mx-auto px-6 py-12">
 
-        {/* UPLOAD STEP */}
         {step === 'upload' && (
           <div className="max-w-2xl mx-auto">
             <div className="text-center mb-10">
@@ -286,17 +283,12 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Drop zone */}
             <div
               onDrop={handleDrop}
               onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
               onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all
-                ${dragOver
-                  ? 'border-indigo-500 bg-indigo-900/10'
-                  : 'border-[#2a2d3d] hover:border-[#3a3f55] bg-[#141720]'
-                }`}
+              className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all ${dragOver ? 'border-indigo-500 bg-indigo-900/10' : 'border-[#2a2d3d] hover:border-[#3a3f55] bg-[#141720]'}`}
             >
               <Upload size={32} className="mx-auto mb-3 text-indigo-400" />
               <p className="text-white font-medium mb-1">Drop files here or click to browse</p>
@@ -311,7 +303,6 @@ export default function Home() {
               />
             </div>
 
-            {/* File list */}
             {files.length > 0 && (
               <div className="mt-4 space-y-2">
                 {files.map((f, i) => (
@@ -329,7 +320,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* Mock data note */}
             <p className="text-center text-gray-600 text-sm mt-4">
               No data? Try with our{' '}
               <a href="/mock_data/slack_export_mock.json" download="slack_export_mock.json" className="text-indigo-400 hover:text-indigo-300 underline">Slack</a>,{' '}
@@ -364,10 +354,8 @@ export default function Home() {
           </div>
         )}
 
-        {/* QUERY STEP */}
         {step === 'query' && (
           <div>
-            {/* Upload summary */}
             <div className="bg-[#141720] border border-[#2a2d3d] rounded-xl p-4 mb-8 flex flex-wrap gap-3 items-center">
               <CheckCircle size={16} className="text-emerald-400 shrink-0" />
               <span className="text-sm text-gray-300 font-medium">Data indexed</span>
@@ -378,7 +366,6 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Insight Panel */}
             {insightsLoading && (
               <div className="mb-8 bg-[#141720] border border-[#2a2d3d] rounded-xl p-6 flex items-center gap-3 text-gray-400">
                 <Loader2 size={16} className="animate-spin text-indigo-400 shrink-0" />
@@ -402,7 +389,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* Query input */}
             <div className="mb-8">
               <div className="flex gap-3">
                 <div className="flex-1 relative">
@@ -426,7 +412,6 @@ export default function Home() {
                 </button>
               </div>
 
-              {/* Sample queries */}
               <div className="mt-3 flex flex-wrap gap-2">
                 {SAMPLE_QUERIES.map((q, i) => (
                   <button
@@ -440,7 +425,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Loading */}
             {querying && (
               <div className="flex items-center gap-3 text-gray-400 py-8 justify-center">
                 <Loader2 size={20} className="animate-spin text-indigo-400" />
@@ -448,14 +432,12 @@ export default function Home() {
               </div>
             )}
 
-            {/* Error */}
             {queryError && (
               <div className="flex items-center gap-2 bg-red-900/20 border border-red-800/50 rounded-lg px-4 py-3 text-red-400 text-sm">
                 <AlertCircle size={16} /> {queryError}
               </div>
             )}
 
-            {/* Result */}
             {result && !querying && (
               <div className="space-y-6">
                 <div className="bg-[#141720] border border-[#2a2d3d] rounded-xl p-6">
@@ -490,10 +472,22 @@ export default function Home() {
         )}
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-[#1e2130] mt-20 py-6 text-center text-xs text-gray-700">
         Filtr · Files processed in-memory and not stored after indexing · Built with Gemini + Pinecone
       </footer>
     </div>
   )
 }
+"""
+
+with open('src/app/page.tsx', 'w', encoding='utf-8', newline='\n') as f:
+    f.write(content)
+
+print('WRITTEN')
+
+# Verify
+c = open('src/app/page.tsx', encoding='utf-8').read()
+print('5s delay:', '}, 5000)' in c)
+print('no 2000:', '}, 2000)' not in c)
+print('sid capture:', 'const sid = data.session_id' in c)
+print('no duplicate:', c.count('setInsightsLoading') == 2)
