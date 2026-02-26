@@ -1,0 +1,17 @@
+[
+  {"type": "message", "user": "U001", "text": "Anyone else seeing the payment button broken on mobile? Getting a 500 error every time I try to checkout.", "ts": "1706789400.000100"},
+  {"type": "message", "user": "U002", "text": "Yes! It's been happening since last Tuesday's deploy. iOS Safari specifically.", "ts": "1706789460.000200"},
+  {"type": "message", "user": "U003", "text": "Customer just called in — she said she gave up trying to buy and went to a competitor. We need to fix this ASAP.", "ts": "1706789520.000300"},
+  {"type": "message", "user": "U001", "text": "Onboarding flow is also confusing our new users. Had 3 people ask this week what the 'workspace' concept means.", "ts": "1706875800.000400"},
+  {"type": "message", "user": "U004", "text": "The CSV export feature people keep asking for — any update on timeline? Sales keeps getting this question on demos.", "ts": "1706875860.000500"},
+  {"type": "message", "user": "U002", "text": "The dashboard loads really slowly when you have more than 50 projects. Users with big accounts are complaining.", "ts": "1706962200.000600"},
+  {"type": "message", "user": "U005", "text": "Mobile app crashes when you try to upload files larger than 5MB. Reproducible every time on Android.", "ts": "1706962260.000700"},
+  {"type": "message", "user": "U003", "text": "Users can't figure out how to invite team members. The settings page buries it under a weird submenu.", "ts": "1707048600.000800"},
+  {"type": "message", "user": "U001", "text": "Password reset emails are going to spam for Gmail users. CX team is getting flooded with tickets about this.", "ts": "1707048660.000900"},
+  {"type": "message", "user": "U004", "text": "The onboarding checklist doesn't remember progress if you close the browser. Users have to start over every time.", "ts": "1707135000.001000"},
+  {"type": "message", "user": "U002", "text": "Search is basically broken. If I search for 'invoice' I don't get results unless I spell it exactly right. No fuzzy matching.", "ts": "1707135060.001100"},
+  {"type": "message", "user": "U005", "text": "Notification settings don't save properly. Users turn off email notifications and they turn back on the next day.", "ts": "1707221400.001200"},
+  {"type": "message", "user": "U001", "text": "Big enterprise prospect asked about SSO. We don't have it and they said it's a dealbreaker. Third one this month.", "ts": "1707221460.001300"},
+  {"type": "message", "user": "U003", "text": "The billing page throws an error when users try to downgrade their plan. This is blocking churned customers from leaving cleanly.", "ts": "1707307800.001400"},
+  {"type": "message", "user": "U004", "text": "Users want dark mode. Getting this feature request constantly in our community forum.", "ts": "1707307860.001500"}
+]

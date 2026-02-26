@@ -52,7 +52,7 @@ function SourceChip({ type }: { type: SourceType }) {
 
 function SourceCard({ source, index }: { source: Source; index: number }) {
   const [expanded, setExpanded] = useState(false)
-  const preview = source.text.length > 120 ? source.text.slice(0, 120) + 'â€¦' : source.text
+  const preview = source.text.length > 120 ? source.text.slice(0, 120) + '…' : source.text
 
   return (
     <div className="bg-[#1a1d27] border border-[#2a2d3d] rounded-lg p-3 hover:border-[#3a3f55] transition-colors">
@@ -185,7 +185,7 @@ export default function Home() {
               onClick={() => { setStep('upload'); setFiles([]); setUploadResults([]); setResult(null); setSessionId(null) }}
               className="text-sm text-gray-400 hover:text-white transition-colors"
             >
-              â† Upload new files
+              ← Upload new files
             </button>)}
         </div>
       </header>
@@ -219,7 +219,7 @@ export default function Home() {
             >
               <Upload size={32} className="mx-auto mb-3 text-indigo-400" />
               <p className="text-white font-medium mb-1">Drop files here or click to browse</p>
-              <p className="text-gray-500 text-sm">Slack JSON Â· Jira CSV Â· Transcripts PDF/TXT Â· Max 10MB per file</p>
+              <p className="text-gray-500 text-sm">Slack JSON · Jira CSV · Transcripts PDF/TXT · Max 10MB per file</p>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -250,7 +250,7 @@ export default function Home() {
             {/* Mock data note */}
             <p className="text-center text-gray-600 text-sm mt-4">
               No data? Try with our{' '}
-              mock dataset{' '}
+              <a href="/mock_data/slack_export_mock.json" className="text-indigo-400 hover:text-indigo-300 underline">Slack</a>, <a href="/mock_data/jira_export_mock.csv" className="text-indigo-400 hover:text-indigo-300 underline">Jira</a>, <a href="/mock_data/transcript_mock.txt" className="text-indigo-400 hover:text-indigo-300 underline">Transcript</a>{' '}
               (Slack + Jira + transcript included)
             </p>
 
@@ -266,7 +266,7 @@ export default function Home() {
               className="mt-6 w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
               {uploading ? (
-                <><Loader2 size={18} className="animate-spin" /> Indexing your dataâ€¦</>
+                <><Loader2 size={18} className="animate-spin" /> Indexing your data…</>
               ) : (
                 <><Zap size={18} /> Analyse My Data</>
               )}
@@ -274,7 +274,7 @@ export default function Home() {
               <p className="text-center text-gray-500 text-xs mt-2">First load may take 30 seconds while the server wakes up.</p>
               {uploading && (
               <p className="text-center text-gray-500 text-sm mt-3">
-                Embedding and indexing â€” this takes 20-60 seconds depending on file size
+                Embedding and indexing ” this takes 20-60 seconds depending on file size
               </p>
             )}
           </div>
@@ -286,7 +286,7 @@ export default function Home() {
             {/* Upload summary */}
             <div className="bg-[#141720] border border-[#2a2d3d] rounded-xl p-4 mb-8 flex flex-wrap gap-3 items-center">
               <CheckCircle size={16} className="text-emerald-400 shrink-0" />
-              <span className="text-sm text-gray-300 font-medium">Data indexed â€”</span>
+              <span className="text-sm text-gray-300 font-medium">Data indexed ”</span>
               {uploadResults.map((r, i) => (
                 <span key={i} className="text-xs bg-[#1e2130] border border-[#2a2d3d] rounded-full px-3 py-1 text-gray-400">
                   {r.file} <span className="text-indigo-400">{r.chunks} chunks</span>
@@ -334,7 +334,7 @@ export default function Home() {
             {querying && (
               <div className="flex items-center gap-3 text-gray-400 py-8 justify-center">
                 <Loader2 size={20} className="animate-spin text-indigo-400" />
-                <span>Searching your data and generating answerâ€¦</span>
+                <span>Searching your data and generating answer…</span>
               </div>
             )}
 
@@ -383,11 +383,15 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t border-[#1e2130] mt-20 py-6 text-center text-xs text-gray-700">
-        Filtr Â· Files processed in-memory and not stored after indexing Â· Built with Gemini + Pinecone
+        Filtr · Files processed in-memory and not stored after indexing · Built with Gemini + Pinecone
       </footer>
     </div>
   )
 }
+
+
+
+
 
 
 
