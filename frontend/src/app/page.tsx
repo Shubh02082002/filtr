@@ -212,7 +212,7 @@ export default function Home() {
           })
           .catch((e) => { console.error('Insights error:', e); setInsights([]) })
           .finally(() => setInsightsLoading(false))
-      }, 5000)
+      }, 15000)
 
     } catch (err: any) {
       setUploadError(err.message)
