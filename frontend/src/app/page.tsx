@@ -615,6 +615,16 @@ export default function Home() {
                   ))}
                 </div>
                 <div className="mt-3 h-px bg-[#2a2d3d]" />
+                <div className="mt-4 text-center">
+                  <a
+                    href="https://forms.gle/W3UCpN3GWmEWJFbz8"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-gray-600 hover:text-indigo-400 transition-colors inline-flex items-center gap-1"
+                  >
+                    ⚡ Did this save you time today? Tell us honestly (2 mins) → Share feedback →
+                  </a>
+                </div>
               </div>
             )}
 
