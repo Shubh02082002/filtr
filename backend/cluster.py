@@ -23,11 +23,11 @@ def name_clusters_with_llm(cluster_excerpts: List[List[str]]) -> List[str]:
     for i, excerpts in enumerate(cluster_excerpts):
         prompt += f"Group {i+1}:\n"
         for e in excerpts:
-            prompt += f"  - {e[:100]}\n"
+            prompt += f"  - {e[:60]}\n"
         prompt += "\n"
     payload = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1024}
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1025}
     }
 
     for attempt in range(3):
@@ -38,10 +38,19 @@ def name_clusters_with_llm(cluster_excerpts: List[List[str]]) -> List[str]:
             continue
         response.raise_for_status()
         raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-        match = re.search(r'\[.*?\]', raw, re.DOTALL)
+        match = re.search(r'\[.*\]', raw, re.DOTALL)
         if not match:
+            salvaged = re.findall(r'"([^"]+)"', raw)
+            if salvaged:
+                n = len(cluster_excerpts)
+                return (salvaged + [f"Theme {i+1}" for i in range(n)])[:n]
             raise ValueError(f"No JSON array found in LLM response: {repr(raw)}")
-        names = json.loads(match.group())
+        try:
+            names = json.loads(match.group())
+        except json.JSONDecodeError:
+            salvaged = re.findall(r'"([^"]+)"', raw)
+            n = len(cluster_excerpts)
+            return (salvaged + [f"Theme {i+1}" for i in range(n)])[:n]
         n = len(cluster_excerpts)
         names = (names + [f"Theme {i+1}" for i in range(n)])[:n]
         return names

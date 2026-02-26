@@ -135,7 +135,7 @@ function ClusterCard({ cluster }: { cluster: Cluster }) {
   )
 }
 
-// ── Stage config ──
+// Stage config
 const STAGES = [
   { key: 'uploaded',   label: 'Uploaded' },
   { key: 'indexed',    label: 'Indexed' },
@@ -152,17 +152,11 @@ const STAGE_STATUS_LINES: Record<StageKey, (chunks: number) => string> = {
   ready:      ()       => 'Naming your top themes...',
 }
 
-// Each milestone sits at these % positions along the bar
-// 4 dots at 0%, 33%, 66%, 100%
-const MILESTONE_POSITIONS = [0, 33, 66, 100]
-
-// Bar fill target per stage — crawls toward next milestone, pauses briefly, then continues
-// Between milestones we animate; on stage change the fill jumps to the milestone %
-const STAGE_FILL: Record<StageKey, number> = {
-  uploaded:   33,   // bar at dot 1
-  indexed:    66,   // bar at dot 2
-  clustering: 82,   // bar crawling toward dot 3 (not yet reached)
-  ready:      92,   // bar crawling toward dot 4 (not yet reached)
+const STAGE_PROGRESS: Record<StageKey, number> = {
+  uploaded:   20,
+  indexed:    45,
+  clustering: 70,
+  ready:      88,
 }
 
 const SAMPLE_QUERIES = [
@@ -171,89 +165,6 @@ const SAMPLE_QUERIES = [
   'What features are users requesting most?',
   'What onboarding problems are users experiencing?',
 ]
-
-// ── Milestone Progress Bar Component ──
-function MilestoneBar({ stageIndex, fillPct }: { stageIndex: number; fillPct: number }) {
-  return (
-    <div className="relative w-full" style={{ height: '28px' }}>
-
-      {/* Track */}
-      <div
-        className="absolute rounded-full"
-        style={{
-          height: '2px',
-          top: '50%',
-          transform: 'translateY(-50%)',
-          left: '0',
-          right: '0',
-          background: '#1e2130',
-        }}
-      />
-
-      {/* Filled portion */}
-      <div
-        className="absolute rounded-full transition-all duration-1000 ease-out"
-        style={{
-          height: '2px',
-          top: '50%',
-          transform: 'translateY(-50%)',
-          left: '0',
-          width: `${fillPct}%`,
-          background: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
-          boxShadow: '0 0 6px rgba(99,102,241,0.5)',
-        }}
-      />
-
-      {/* Milestone dots */}
-      {MILESTONE_POSITIONS.map((pos, i) => {
-        const isComplete = i < stageIndex
-        const isActive = i === stageIndex
-
-        return (
-          <div
-            key={i}
-            className="absolute transition-all duration-500"
-            style={{
-              left: `${pos}%`,
-              top: '50%',
-              transform: 'translate(-50%, -50%)',
-            }}
-          >
-            {/* Pulse ring for active dot */}
-            {isActive && (
-              <div
-                className="absolute rounded-full animate-ping"
-                style={{
-                  width: '16px',
-                  height: '16px',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  background: 'rgba(99,102,241,0.25)',
-                }}
-              />
-            )}
-            {/* Dot */}
-            <div
-              className="relative rounded-full transition-all duration-500"
-              style={{
-                width: isActive ? '10px' : '8px',
-                height: isActive ? '10px' : '8px',
-                background: isComplete
-                  ? '#6366f1'
-                  : isActive
-                  ? '#a5b4fc'
-                  : '#1e2130',
-                border: isActive ? '2px solid #6366f1' : isComplete ? 'none' : '2px solid #374151',
-                boxShadow: isActive ? '0 0 10px rgba(99,102,241,0.8)' : 'none',
-              }}
-            />
-          </div>
-        )
-      })}
-    </div>
-  )
-}
 
 export default function Home() {
   const [step, setStep] = useState<'upload' | 'loading' | 'query'>('upload')
@@ -273,11 +184,7 @@ export default function Home() {
   // Progressive UI state
   const [currentStage, setCurrentStage] = useState<StageKey>('uploaded')
   const [countdown, setCountdown] = useState(45)
-  // Smooth fill % — animates continuously, milestone events snap it to dot positions
-  const [fillPct, setFillPct] = useState(0)
-
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const fillRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const totalChunks = uploadResults.reduce((a, r) => a + r.chunks, 0)
@@ -295,21 +202,6 @@ export default function Home() {
 
   const stopCountdown = () => {
     if (countdownRef.current) clearInterval(countdownRef.current)
-    if (fillRef.current) clearInterval(fillRef.current)
-  }
-
-  // Crawl fill toward a target %, stepping by `step` every `intervalMs`
-  const crawlFill = (targetPct: number, stepSize = 0.4, intervalMs = 80) => {
-    if (fillRef.current) clearInterval(fillRef.current)
-    fillRef.current = setInterval(() => {
-      setFillPct(prev => {
-        if (prev >= targetPct) {
-          clearInterval(fillRef.current!)
-          return targetPct
-        }
-        return Math.min(prev + stepSize, targetPct)
-      })
-    }, intervalMs)
   }
 
   useEffect(() => () => stopCountdown(), [])
@@ -333,26 +225,21 @@ export default function Home() {
     setUploading(true)
     setUploadError(null)
     setCurrentStage('uploaded')
-    setFillPct(0)
-    startCountdown(60)
-    setStep('loading')
+    startCountdown(45)
+    setStep('loading')        // ← MOVE THIS HERE — show loading screen immediately
     setInsights([])
-
-    // Crawl toward dot 1 (33%)
-    crawlFill(28)
 
     const formData = new FormData()
     files.forEach(f => formData.append('files', f))
 
     try {
+      // Wake up Render
       await fetch(`${API_BASE}/health`).catch(() => {})
       await new Promise(resolve => setTimeout(resolve, 3000))
 
-      // Hit dot 1, snap to 33%, start crawling toward dot 2
+      // Stage 2 — indexing
       setCurrentStage('indexed')
-      setFillPct(33)
-      startCountdown(40)
-      crawlFill(58)
+      startCountdown(30)
 
       const res = await fetch(`${API_BASE}/ingest`, { method: 'POST', body: formData })
       if (!res.ok) {
@@ -363,22 +250,20 @@ export default function Home() {
       setSessionId(data.session_id)
       setUploadResults(data.files)
 
-      // Hit dot 2, snap to 66%, start crawling toward dot 3
+      // Move to dedicated loading screen — Stage 3
       setCurrentStage('clustering')
-      setFillPct(66)
-      startCountdown(25)
-      crawlFill(88)
+      startCountdown(20)
+      setInsights([])
 
       const sid = data.session_id
 
-      // After 15s assume naming stage — crawl toward dot 4
+      // After 15s assume we're in naming stage
       setTimeout(() => {
         setCurrentStage('ready')
-        setFillPct(90)
-        startCountdown(10)
-        crawlFill(96)
+        startCountdown(8)
       }, 15000)
 
+      // Fetch insights
       setTimeout(() => {
         fetch(`${API_BASE}/insights`, {
           method: 'POST',
@@ -390,8 +275,7 @@ export default function Home() {
           .catch(() => setInsights([]))
           .finally(() => {
             stopCountdown()
-            setFillPct(100)
-            setTimeout(() => setStep('query'), 400)
+            setStep('query')
           })
       }, 2000)
 
@@ -431,6 +315,7 @@ export default function Home() {
   }
 
   const stageIndex = STAGES.findIndex(s => s.key === currentStage)
+  const progressWidth = STAGE_PROGRESS[currentStage]
 
   return (
     <div className="min-h-screen bg-[#0f1117]">
@@ -477,6 +362,7 @@ export default function Home() {
               </p>
             </div>
 
+            {/* Drop zone */}
             <div
               onDrop={handleDrop}
               onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
@@ -499,6 +385,7 @@ export default function Home() {
               />
             </div>
 
+            {/* File list */}
             {files.length > 0 && (
               <div className="mt-4 space-y-2">
                 {files.map((f, i) => (
@@ -541,6 +428,11 @@ export default function Home() {
               }
             </button>
             <p className="text-center text-gray-500 text-xs mt-2">First load may take 30 seconds while the server wakes up.</p>
+            {uploading && (
+              <p className="text-center text-gray-500 text-sm mt-3">
+                Embedding and indexing — this takes 20–60 seconds depending on file size
+              </p>
+            )}
           </div>
         )}
 
@@ -548,32 +440,47 @@ export default function Home() {
         {step === 'loading' && (
           <div className="max-w-md mx-auto mt-24">
 
-            <div className="text-center mb-12">
+            <div className="text-center mb-10">
               <p className="text-xs text-gray-600 uppercase tracking-widest mb-4">Analysing Your Data</p>
               <p className="text-3xl font-light text-white tabular-nums">~{countdown}s remaining</p>
             </div>
 
-            {/* Milestone progress bar */}
-            <div className="mb-3 px-1">
-              <MilestoneBar stageIndex={stageIndex} fillPct={fillPct} />
+            {/* Progress bar */}
+            <div className="relative mb-5">
+              <div className="w-full rounded-full" style={{ height: '2px', background: '#1e2130' }}>
+                <div
+                  className="rounded-full transition-all duration-1000 ease-out"
+                  style={{
+                    height: '2px',
+                    width: `${progressWidth}%`,
+                    background: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
+                    boxShadow: '0 0 8px rgba(99,102,241,0.6)',
+                  }}
+                />
+              </div>
+              {/* Glow dot */}
+              <div
+                className="absolute rounded-full transition-all duration-1000 ease-out"
+                style={{
+                  width: '6px', height: '6px',
+                  top: '50%', transform: 'translateY(-50%)',
+                  left: `calc(${progressWidth}% - 3px)`,
+                  background: '#a5b4fc',
+                  boxShadow: '0 0 8px #818cf8',
+                }}
+              />
             </div>
 
-            {/* Stage labels — aligned to milestone dot positions */}
-            <div className="relative mb-10" style={{ height: '20px' }}>
+            {/* Step labels */}
+            <div className="flex justify-between mb-10">
               {STAGES.map((s, i) => {
                 const isComplete = i < stageIndex
                 const isActive = i === stageIndex
-                const pos = MILESTONE_POSITIONS[i]
                 return (
                   <span
                     key={s.key}
-                    className="absolute text-xs uppercase tracking-wide transition-colors duration-500"
-                    style={{
-                      left: `${pos}%`,
-                      transform: i === 0 ? 'translateX(0)' : i === STAGES.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)',
-                      color: isComplete ? '#6366f1' : isActive ? '#ffffff' : '#374151',
-                      fontWeight: isActive ? '600' : '400',
-                    }}
+                    className="text-xs uppercase tracking-wide transition-colors duration-500"
+                    style={{ color: isComplete ? '#6366f1' : isActive ? '#ffffff' : '#374151' }}
                   >
                     {s.label}
                   </span>
@@ -592,6 +499,7 @@ export default function Home() {
         {/* ── QUERY STEP ── */}
         {step === 'query' && (
           <div>
+            {/* Upload summary */}
             <div className="bg-[#141720] border border-[#2a2d3d] rounded-xl p-4 mb-8 flex flex-wrap gap-3 items-center">
               <CheckCircle size={16} className="text-emerald-400 shrink-0" />
               <span className="text-sm text-gray-300 font-medium">Data indexed</span>
@@ -602,6 +510,7 @@ export default function Home() {
               ))}
             </div>
 
+            {/* Cluster cards */}
             {insights.length > 0 && (
               <div className="mb-8">
                 <div className="flex items-center gap-2 mb-4">
@@ -618,6 +527,7 @@ export default function Home() {
               </div>
             )}
 
+            {/* Query input */}
             <div className="mb-8">
               <div className="flex gap-3">
                 <div className="flex-1 relative">

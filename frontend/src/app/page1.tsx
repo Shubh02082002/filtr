@@ -58,7 +58,7 @@ function SourceChip({ type }: { type: SourceType }) {
   )
 }
 
-function SourceCard({ source }: { source: Source }) {
+function SourceCard({ source, index }: { source: Source; index: number }) {
   const [expanded, setExpanded] = useState(false)
   const preview = source.text.length > 120 ? source.text.slice(0, 120) + '...' : source.text
 
@@ -135,7 +135,7 @@ function ClusterCard({ cluster }: { cluster: Cluster }) {
   )
 }
 
-// ── Stage config ──
+// Stage config
 const STAGES = [
   { key: 'uploaded',   label: 'Uploaded' },
   { key: 'indexed',    label: 'Indexed' },
@@ -146,23 +146,18 @@ const STAGES = [
 type StageKey = typeof STAGES[number]['key']
 
 const STAGE_STATUS_LINES: Record<StageKey, (chunks: number) => string> = {
-  uploaded:   ()       => 'Uploading your files...',
-  indexed:    ()       => 'Embedding & indexing your data...',
+  uploaded:   () => 'Uploading your files...',
+  indexed:    () => 'Embedding & indexing your data...',
   clustering: (chunks) => `Finding patterns across ${chunks} chunks...`,
-  ready:      ()       => 'Naming your top themes...',
+  ready:      () => 'Naming your top themes...',
 }
 
-// Each milestone sits at these % positions along the bar
-// 4 dots at 0%, 33%, 66%, 100%
-const MILESTONE_POSITIONS = [0, 33, 66, 100]
-
-// Bar fill target per stage — crawls toward next milestone, pauses briefly, then continues
-// Between milestones we animate; on stage change the fill jumps to the milestone %
-const STAGE_FILL: Record<StageKey, number> = {
-  uploaded:   33,   // bar at dot 1
-  indexed:    66,   // bar at dot 2
-  clustering: 82,   // bar crawling toward dot 3 (not yet reached)
-  ready:      92,   // bar crawling toward dot 4 (not yet reached)
+// Progress bar % per stage
+const STAGE_PROGRESS: Record<StageKey, number> = {
+  uploaded:   20,
+  indexed:    45,
+  clustering: 70,
+  ready:      88,
 }
 
 const SAMPLE_QUERIES = [
@@ -172,91 +167,8 @@ const SAMPLE_QUERIES = [
   'What onboarding problems are users experiencing?',
 ]
 
-// ── Milestone Progress Bar Component ──
-function MilestoneBar({ stageIndex, fillPct }: { stageIndex: number; fillPct: number }) {
-  return (
-    <div className="relative w-full" style={{ height: '28px' }}>
-
-      {/* Track */}
-      <div
-        className="absolute rounded-full"
-        style={{
-          height: '2px',
-          top: '50%',
-          transform: 'translateY(-50%)',
-          left: '0',
-          right: '0',
-          background: '#1e2130',
-        }}
-      />
-
-      {/* Filled portion */}
-      <div
-        className="absolute rounded-full transition-all duration-1000 ease-out"
-        style={{
-          height: '2px',
-          top: '50%',
-          transform: 'translateY(-50%)',
-          left: '0',
-          width: `${fillPct}%`,
-          background: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
-          boxShadow: '0 0 6px rgba(99,102,241,0.5)',
-        }}
-      />
-
-      {/* Milestone dots */}
-      {MILESTONE_POSITIONS.map((pos, i) => {
-        const isComplete = i < stageIndex
-        const isActive = i === stageIndex
-
-        return (
-          <div
-            key={i}
-            className="absolute transition-all duration-500"
-            style={{
-              left: `${pos}%`,
-              top: '50%',
-              transform: 'translate(-50%, -50%)',
-            }}
-          >
-            {/* Pulse ring for active dot */}
-            {isActive && (
-              <div
-                className="absolute rounded-full animate-ping"
-                style={{
-                  width: '16px',
-                  height: '16px',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  background: 'rgba(99,102,241,0.25)',
-                }}
-              />
-            )}
-            {/* Dot */}
-            <div
-              className="relative rounded-full transition-all duration-500"
-              style={{
-                width: isActive ? '10px' : '8px',
-                height: isActive ? '10px' : '8px',
-                background: isComplete
-                  ? '#6366f1'
-                  : isActive
-                  ? '#a5b4fc'
-                  : '#1e2130',
-                border: isActive ? '2px solid #6366f1' : isComplete ? 'none' : '2px solid #374151',
-                boxShadow: isActive ? '0 0 10px rgba(99,102,241,0.8)' : 'none',
-              }}
-            />
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 export default function Home() {
-  const [step, setStep] = useState<'upload' | 'loading' | 'query'>('upload')
+  const [step, setStep] = useState<'upload' | 'query'>('upload')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [files, setFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
@@ -269,17 +181,16 @@ export default function Home() {
   const [showSources, setShowSources] = useState(true)
   const [dragOver, setDragOver] = useState(false)
   const [insights, setInsights] = useState<Cluster[]>([])
+  const [insightsLoading, setInsightsLoading] = useState(false)
 
   // Progressive UI state
   const [currentStage, setCurrentStage] = useState<StageKey>('uploaded')
   const [countdown, setCountdown] = useState(45)
-  // Smooth fill % — animates continuously, milestone events snap it to dot positions
-  const [fillPct, setFillPct] = useState(0)
-
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const fillRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Total chunks across all uploaded files
   const totalChunks = uploadResults.reduce((a, r) => a + r.chunks, 0)
 
   const startCountdown = (from: number) => {
@@ -287,7 +198,10 @@ export default function Home() {
     setCountdown(from)
     countdownRef.current = setInterval(() => {
       setCountdown(prev => {
-        if (prev <= 1) { clearInterval(countdownRef.current!); return 1 }
+        if (prev <= 1) {
+          clearInterval(countdownRef.current!)
+          return 1
+        }
         return prev - 1
       })
     }, 1000)
@@ -295,33 +209,22 @@ export default function Home() {
 
   const stopCountdown = () => {
     if (countdownRef.current) clearInterval(countdownRef.current)
-    if (fillRef.current) clearInterval(fillRef.current)
   }
 
-  // Crawl fill toward a target %, stepping by `step` every `intervalMs`
-  const crawlFill = (targetPct: number, stepSize = 0.4, intervalMs = 80) => {
-    if (fillRef.current) clearInterval(fillRef.current)
-    fillRef.current = setInterval(() => {
-      setFillPct(prev => {
-        if (prev >= targetPct) {
-          clearInterval(fillRef.current!)
-          return targetPct
-        }
-        return Math.min(prev + stepSize, targetPct)
-      })
-    }, intervalMs)
-  }
-
+  // Clean up on unmount
   useEffect(() => () => stopCountdown(), [])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setDragOver(false)
-    setFiles(prev => [...prev, ...Array.from(e.dataTransfer.files)])
+    const dropped = Array.from(e.dataTransfer.files)
+    setFiles(prev => [...prev, ...dropped])
   }, [])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) setFiles(prev => [...prev, ...Array.from(e.target.files!)])
+    if (e.target.files) {
+      setFiles(prev => [...prev, ...Array.from(e.target.files!)])
+    }
   }
 
   const removeFile = (index: number) => {
@@ -333,26 +236,19 @@ export default function Home() {
     setUploading(true)
     setUploadError(null)
     setCurrentStage('uploaded')
-    setFillPct(0)
-    startCountdown(60)
-    setStep('loading')
-    setInsights([])
-
-    // Crawl toward dot 1 (33%)
-    crawlFill(28)
+    startCountdown(45)
 
     const formData = new FormData()
     files.forEach(f => formData.append('files', f))
 
     try {
+      // Wake up Render
       await fetch(`${API_BASE}/health`).catch(() => {})
       await new Promise(resolve => setTimeout(resolve, 3000))
 
-      // Hit dot 1, snap to 33%, start crawling toward dot 2
+      // Stage 2 — indexing
       setCurrentStage('indexed')
-      setFillPct(33)
-      startCountdown(40)
-      crawlFill(58)
+      startCountdown(30)
 
       const res = await fetch(`${API_BASE}/ingest`, { method: 'POST', body: formData })
       if (!res.ok) {
@@ -363,22 +259,22 @@ export default function Home() {
       setSessionId(data.session_id)
       setUploadResults(data.files)
 
-      // Hit dot 2, snap to 66%, start crawling toward dot 3
+      // Transition to query screen — Stage 3 starts here
       setCurrentStage('clustering')
-      setFillPct(66)
-      startCountdown(25)
-      crawlFill(88)
+      startCountdown(20)
+      setStep('query')
+      setInsightsLoading(true)
+      setInsights([])
 
       const sid = data.session_id
 
-      // After 15s assume naming stage — crawl toward dot 4
+      // After 15s assume we're in naming stage
       setTimeout(() => {
         setCurrentStage('ready')
-        setFillPct(90)
-        startCountdown(10)
-        crawlFill(96)
+        startCountdown(8)
       }, 15000)
 
+      // Fetch insights (2s delay = safe buffer after ingest)
       setTimeout(() => {
         fetch(`${API_BASE}/insights`, {
           method: 'POST',
@@ -386,19 +282,19 @@ export default function Home() {
           body: JSON.stringify({ session_id: sid, n_clusters: 5 }),
         })
           .then(r => r.json())
-          .then(d => { setInsights(d.clusters || []) })
+          .then(d => {
+            setInsights(d.clusters || [])
+          })
           .catch(() => setInsights([]))
           .finally(() => {
             stopCountdown()
-            setFillPct(100)
-            setTimeout(() => setStep('query'), 400)
+            setInsightsLoading(false)
           })
       }, 2000)
 
     } catch (err: any) {
       setUploadError(err.message)
       stopCountdown()
-      setStep('upload')
     } finally {
       setUploading(false)
     }
@@ -422,7 +318,8 @@ export default function Home() {
         const err = await res.json()
         throw new Error(err.detail || 'Query failed')
       }
-      setResult(await res.json())
+      const data = await res.json()
+      setResult(data)
     } catch (err: any) {
       setQueryError(err.message)
     } finally {
@@ -431,10 +328,10 @@ export default function Home() {
   }
 
   const stageIndex = STAGES.findIndex(s => s.key === currentStage)
+  const progressWidth = STAGE_PROGRESS[currentStage]
 
   return (
     <div className="min-h-screen bg-[#0f1117]">
-
       {/* Header */}
       <header className="border-b border-[#1e2130] bg-[#0f1117]/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -454,6 +351,7 @@ export default function Home() {
                 setResult(null)
                 setSessionId(null)
                 setInsights([])
+                setInsightsLoading(false)
                 stopCountdown()
               }}
               className="text-sm text-gray-400 hover:text-white transition-colors"
@@ -466,25 +364,30 @@ export default function Home() {
 
       <main className="max-w-5xl mx-auto px-6 py-12">
 
-        {/* ── UPLOAD STEP ── */}
+        {/* UPLOAD STEP */}
         {step === 'upload' && (
           <div className="max-w-2xl mx-auto">
             <div className="text-center mb-10">
-              <h1 className="text-3xl font-bold text-white mb-3">What are users actually saying?</h1>
+              <h1 className="text-3xl font-bold text-white mb-3">
+                What are users actually saying?
+              </h1>
               <p className="text-gray-400 text-lg">
                 Upload your Slack export, Jira CSV, or call transcripts.<br />
                 Ask questions in plain English. Get sourced answers in seconds.
               </p>
             </div>
 
+            {/* Drop zone */}
             <div
               onDrop={handleDrop}
               onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
               onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all ${
-                dragOver ? 'border-indigo-500 bg-indigo-900/10' : 'border-[#2a2d3d] hover:border-[#3a3f55] bg-[#141720]'
-              }`}
+              className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all
+                ${dragOver
+                  ? 'border-indigo-500 bg-indigo-900/10'
+                  : 'border-[#2a2d3d] hover:border-[#3a3f55] bg-[#141720]'
+                }`}
             >
               <Upload size={32} className="mx-auto mb-3 text-indigo-400" />
               <p className="text-white font-medium mb-1">Drop files here or click to browse</p>
@@ -495,10 +398,11 @@ export default function Home() {
                 multiple
                 accept=".json,.csv,.pdf,.txt"
                 onChange={handleFileSelect}
-                style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, overflow: 'hidden' }}
+                style={{ position: "absolute", width: "1px", height: "1px", opacity: 0, overflow: "hidden" }}
               />
             </div>
 
+            {/* File list */}
             {files.length > 0 && (
               <div className="mt-4 space-y-2">
                 {files.map((f, i) => (
@@ -516,11 +420,12 @@ export default function Home() {
               </div>
             )}
 
+            {/* Mock data note */}
             <p className="text-center text-gray-600 text-sm mt-4">
               No data? Try with our{' '}
-              <a href="/mock_data/slack_export_mock.json" download className="text-indigo-400 hover:text-indigo-300 underline">Slack</a>,{' '}
+              <a href="/mock_data/slack_export_mock.json" download="slack_export_mock.json" className="text-indigo-400 hover:text-indigo-300 underline">Slack</a>,{' '}
               <a href="/mock_data/jira_export_mock.csv" className="text-indigo-400 hover:text-indigo-300 underline">Jira</a>,{' '}
-              <a href="/mock_data/transcript_mock.txt" download className="text-indigo-400 hover:text-indigo-300 underline">Transcript</a>{' '}
+              <a href="/mock_data/transcript_mock.txt" download="transcript_mock.txt" className="text-indigo-400 hover:text-indigo-300 underline">Transcript</a>{' '}
               mock files
             </p>
 
@@ -535,63 +440,25 @@ export default function Home() {
               disabled={!files.length || uploading}
               className="mt-6 w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
-              {uploading
-                ? <><Loader2 size={18} className="animate-spin" /> Indexing your data...</>
-                : <><Zap size={18} /> Analyse My Data</>
-              }
+              {uploading ? (
+                <><Loader2 size={18} className="animate-spin" /> Indexing your data...</>
+              ) : (
+                <><Zap size={18} /> Analyse My Data</>
+              )}
             </button>
             <p className="text-center text-gray-500 text-xs mt-2">First load may take 30 seconds while the server wakes up.</p>
+            {uploading && (
+              <p className="text-center text-gray-500 text-sm mt-3">
+                Embedding and indexing — this takes 20–60 seconds depending on file size
+              </p>
+            )}
           </div>
         )}
 
-        {/* ── LOADING STEP ── */}
-        {step === 'loading' && (
-          <div className="max-w-md mx-auto mt-24">
-
-            <div className="text-center mb-12">
-              <p className="text-xs text-gray-600 uppercase tracking-widest mb-4">Analysing Your Data</p>
-              <p className="text-3xl font-light text-white tabular-nums">~{countdown}s remaining</p>
-            </div>
-
-            {/* Milestone progress bar */}
-            <div className="mb-3 px-1">
-              <MilestoneBar stageIndex={stageIndex} fillPct={fillPct} />
-            </div>
-
-            {/* Stage labels — aligned to milestone dot positions */}
-            <div className="relative mb-10" style={{ height: '20px' }}>
-              {STAGES.map((s, i) => {
-                const isComplete = i < stageIndex
-                const isActive = i === stageIndex
-                const pos = MILESTONE_POSITIONS[i]
-                return (
-                  <span
-                    key={s.key}
-                    className="absolute text-xs uppercase tracking-wide transition-colors duration-500"
-                    style={{
-                      left: `${pos}%`,
-                      transform: i === 0 ? 'translateX(0)' : i === STAGES.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)',
-                      color: isComplete ? '#6366f1' : isActive ? '#ffffff' : '#374151',
-                      fontWeight: isActive ? '600' : '400',
-                    }}
-                  >
-                    {s.label}
-                  </span>
-                )
-              })}
-            </div>
-
-            {/* Status line */}
-            <p className="text-center text-sm text-gray-600">
-              {STAGE_STATUS_LINES[currentStage](totalChunks)}
-            </p>
-
-          </div>
-        )}
-
-        {/* ── QUERY STEP ── */}
+        {/* QUERY STEP */}
         {step === 'query' && (
           <div>
+            {/* Upload summary */}
             <div className="bg-[#141720] border border-[#2a2d3d] rounded-xl p-4 mb-8 flex flex-wrap gap-3 items-center">
               <CheckCircle size={16} className="text-emerald-400 shrink-0" />
               <span className="text-sm text-gray-300 font-medium">Data indexed</span>
@@ -602,7 +469,75 @@ export default function Home() {
               ))}
             </div>
 
-            {insights.length > 0 && (
+            {/* ── PROGRESSIVE LOADING INDICATOR ── */}
+            {insightsLoading && (
+              <div className="mb-8 rounded-xl p-8" style={{ background: '#111318' }}>
+
+                {/* Header */}
+                <div className="text-center mb-8">
+                  <p className="text-xs text-gray-600 uppercase tracking-widest mb-3">Analysing Your Data</p>
+                  <p className="text-2xl font-light text-white tabular-nums">
+                    ~{countdown}s remaining
+                  </p>
+                </div>
+
+                {/* Progress bar */}
+                <div className="relative mb-4">
+                  <div className="w-full rounded-full" style={{ height: '2px', background: '#1e2130' }}>
+                    <div
+                      className="rounded-full transition-all duration-1000 ease-out"
+                      style={{
+                        height: '2px',
+                        width: `${progressWidth}%`,
+                        background: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
+                        boxShadow: '0 0 8px rgba(99,102,241,0.6)',
+                      }}
+                    />
+                  </div>
+                  {/* Glow dot at leading edge */}
+                  <div
+                    className="absolute rounded-full transition-all duration-1000 ease-out"
+                    style={{
+                      width: '6px',
+                      height: '6px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      left: `calc(${progressWidth}% - 3px)`,
+                      background: '#a5b4fc',
+                      boxShadow: '0 0 8px #818cf8',
+                    }}
+                  />
+                </div>
+
+                {/* Step labels */}
+                <div className="flex justify-between mb-8">
+                  {STAGES.map((s, i) => {
+                    const isComplete = i < stageIndex
+                    const isActive = i === stageIndex
+                    return (
+                      <span
+                        key={s.key}
+                        className="text-xs uppercase tracking-wide transition-colors duration-500"
+                        style={{
+                          color: isComplete ? '#6366f1' : isActive ? '#ffffff' : '#374151',
+                        }}
+                      >
+                        {s.label}
+                      </span>
+                    )
+                  })}
+                </div>
+
+                {/* Dynamic status line */}
+                <p className="text-center text-sm text-gray-600">
+                  {STAGE_STATUS_LINES[currentStage](totalChunks)}
+                </p>
+
+              </div>
+            )}
+
+            {/* Cluster cards */}
+            {!insightsLoading && insights.length > 0 && (
               <div className="mb-8">
                 <div className="flex items-center gap-2 mb-4">
                   <Zap size={14} className="text-indigo-400" />
@@ -618,6 +553,7 @@ export default function Home() {
               </div>
             )}
 
+            {/* Query input */}
             <div className="mb-8">
               <div className="flex gap-3">
                 <div className="flex-1 relative">
@@ -641,6 +577,7 @@ export default function Home() {
                 </button>
               </div>
 
+              {/* Sample queries */}
               <div className="mt-3 flex flex-wrap gap-2">
                 {SAMPLE_QUERIES.map((q, i) => (
                   <button
@@ -654,6 +591,7 @@ export default function Home() {
               </div>
             </div>
 
+            {/* Loading */}
             {querying && (
               <div className="flex items-center gap-3 text-gray-400 py-8 justify-center">
                 <Loader2 size={20} className="animate-spin text-indigo-400" />
@@ -661,12 +599,14 @@ export default function Home() {
               </div>
             )}
 
+            {/* Error */}
             {queryError && (
               <div className="flex items-center gap-2 bg-red-900/20 border border-red-800/50 rounded-lg px-4 py-3 text-red-400 text-sm">
                 <AlertCircle size={16} /> {queryError}
               </div>
             )}
 
+            {/* Result */}
             {result && !querying && (
               <div className="space-y-6">
                 <div className="bg-[#141720] border border-[#2a2d3d] rounded-xl p-6">
@@ -690,7 +630,7 @@ export default function Home() {
                   {showSources && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {result.sources.map((source, i) => (
-                        <SourceCard key={i} source={source} />
+                        <SourceCard key={i} source={source} index={i} />
                       ))}
                     </div>
                   )}
@@ -699,9 +639,9 @@ export default function Home() {
             )}
           </div>
         )}
-
       </main>
 
+      {/* Footer */}
       <footer className="border-t border-[#1e2130] mt-20 py-6 text-center text-xs text-gray-700">
         Filtr · Files processed in-memory and not stored after indexing · Built with Gemini + Pinecone
       </footer>
