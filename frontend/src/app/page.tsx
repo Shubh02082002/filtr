@@ -1,7 +1,7 @@
-﻿'use client'
+'use client'
 
 import { useState, useRef, useCallback } from 'react'
-import { Upload, Search, FileText, MessageSquare, Layers, ChevronDown, ChevronUp, Loader2, CheckCircle, AlertCircle, X, Zap } from 'lucide-react'
+import { Upload, Search, FileText, MessageSquare, Layers, ChevronDown, ChevronUp, Loader2, CheckCircle, AlertCircle, X, Zap, ThumbsUp, ThumbsDown } from 'lucide-react'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -29,6 +29,14 @@ interface FileResult {
   warning?: string
 }
 
+interface Cluster {
+  cluster_idx: number
+  count: number
+  excerpts: string[]
+  sources: { slack: number; jira: number; transcript: number }
+  name: string
+}
+
 const SOURCE_COLORS: Record<SourceType, string> = {
   slack: 'bg-purple-900/40 border-purple-700/50 text-purple-300',
   jira: 'bg-blue-900/40 border-blue-700/50 text-blue-300',
@@ -52,7 +60,7 @@ function SourceChip({ type }: { type: SourceType }) {
 
 function SourceCard({ source, index }: { source: Source; index: number }) {
   const [expanded, setExpanded] = useState(false)
-  const preview = source.text.length > 120 ? source.text.slice(0, 120) + '…' : source.text
+  const preview = source.text.length > 120 ? source.text.slice(0, 120) + '...' : source.text
 
   return (
     <div className="bg-[#1a1d27] border border-[#2a2d3d] rounded-lg p-3 hover:border-[#3a3f55] transition-colors">
@@ -72,7 +80,57 @@ function SourceCard({ source, index }: { source: Source; index: number }) {
           className="mt-1 text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
         >
           {expanded ? <><ChevronUp size={12} /> Show less</> : <><ChevronDown size={12} /> Show more</>}
-        </button>)}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function ClusterCard({ cluster }: { cluster: Cluster }) {
+  const [vote, setVote] = useState<'up' | 'down' | null>(null)
+
+  return (
+    <div className="bg-[#141720] border border-[#2a2d3d] rounded-xl p-4 hover:border-[#3a3f55] transition-colors">
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <span className="font-semibold text-slate-100 text-sm leading-snug">{cluster.name}</span>
+        <span className="text-xs text-slate-400 bg-[#1e2130] px-2 py-1 rounded-full shrink-0 border border-[#2a2d3d]">
+          {cluster.count} mentions
+        </span>
+      </div>
+      <div className="flex gap-2 flex-wrap mb-3">
+        {cluster.sources.slack > 0 && (
+          <span className="text-xs bg-purple-900/40 text-purple-300 border border-purple-700/50 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+            <MessageSquare size={10} /> Slack {cluster.sources.slack}
+          </span>
+        )}
+        {cluster.sources.jira > 0 && (
+          <span className="text-xs bg-blue-900/40 text-blue-300 border border-blue-700/50 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+            <Layers size={10} /> Jira {cluster.sources.jira}
+          </span>
+        )}
+        {cluster.sources.transcript > 0 && (
+          <span className="text-xs bg-emerald-900/40 text-emerald-300 border border-emerald-700/50 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+            <FileText size={10} /> Transcript {cluster.sources.transcript}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center justify-between pt-2 border-t border-[#2a2d3d]">
+        <span className="text-xs text-gray-600">Was this cluster useful?</span>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setVote('up')}
+            className={`p-1.5 rounded-lg transition-colors ${vote === 'up' ? 'bg-emerald-900/50 text-emerald-400' : 'text-gray-600 hover:text-emerald-400 hover:bg-emerald-900/20'}`}
+          >
+            <ThumbsUp size={13} />
+          </button>
+          <button
+            onClick={() => setVote('down')}
+            className={`p-1.5 rounded-lg transition-colors ${vote === 'down' ? 'bg-red-900/50 text-red-400' : 'text-gray-600 hover:text-red-400 hover:bg-red-900/20'}`}
+          >
+            <ThumbsDown size={13} />
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -97,6 +155,8 @@ export default function Home() {
   const [queryError, setQueryError] = useState<string | null>(null)
   const [showSources, setShowSources] = useState(true)
   const [dragOver, setDragOver] = useState(false)
+  const [insights, setInsights] = useState<Cluster[]>([])
+  const [insightsLoading, setInsightsLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -134,6 +194,25 @@ export default function Home() {
       setSessionId(data.session_id)
       setUploadResults(data.files)
       setStep('query')
+
+      // Auto-fetch insights after upload
+      setInsightsLoading(true)
+      setInsights([])
+      setTimeout(() => {
+        fetch(`${API_BASE}/insights`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: data.session_id, n_clusters: 5 }),
+        })
+          .then(r => r.json())
+          .then(d => {
+            console.log('Insights received:', d)
+            setInsights(d.clusters || [])
+          })
+          .catch((e) => { console.error('Insights error:', e); setInsights([]) })
+          .finally(() => setInsightsLoading(false))
+      }, 2000)
+
     } catch (err: any) {
       setUploadError(err.message)
     } finally {
@@ -182,17 +261,18 @@ export default function Home() {
           </div>
           {step === 'query' && (
             <button
-              onClick={() => { setStep('upload'); setFiles([]); setUploadResults([]); setResult(null); setSessionId(null) }}
+              onClick={() => { setStep('upload'); setFiles([]); setUploadResults([]); setResult(null); setSessionId(null); setInsights([]) }}
               className="text-sm text-gray-400 hover:text-white transition-colors"
             >
-              ← Upload new files
-            </button>)}
+              Back to upload
+            </button>
+          )}
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-12">
 
-        {/* â”€â”€ UPLOAD STEP â”€â”€ */}
+        {/* UPLOAD STEP */}
         {step === 'upload' && (
           <div className="max-w-2xl mx-auto">
             <div className="text-center mb-10">
@@ -226,7 +306,7 @@ export default function Home() {
                 multiple
                 accept=".json,.csv,.pdf,.txt"
                 onChange={handleFileSelect}
-                style={{position:"absolute",width:"1px",height:"1px",opacity:0,overflow:"hidden"}}
+                style={{ position: "absolute", width: "1px", height: "1px", opacity: 0, overflow: "hidden" }}
               />
             </div>
 
@@ -242,7 +322,8 @@ export default function Home() {
                     </div>
                     <button onClick={() => removeFile(i)} className="text-gray-600 hover:text-red-400 transition-colors">
                       <X size={14} />
-                    </button></div>
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -250,8 +331,10 @@ export default function Home() {
             {/* Mock data note */}
             <p className="text-center text-gray-600 text-sm mt-4">
               No data? Try with our{' '}
-              <a href="/mock_data/slack_export_mock.json" download="slack_export_mock.json" className="text-indigo-400 hover:text-indigo-300 underline">Slack</a>, <a href="/mock_data/jira_export_mock.csv" className="text-indigo-400 hover:text-indigo-300 underline">Jira</a>, <a href="/mock_data/transcript_mock.txt" download="transcript_mock.txt" className="text-indigo-400 hover:text-indigo-300 underline">Transcript</a>{' '}
-              (Slack + Jira + transcript included)
+              <a href="/mock_data/slack_export_mock.json" download="slack_export_mock.json" className="text-indigo-400 hover:text-indigo-300 underline">Slack</a>,{' '}
+              <a href="/mock_data/jira_export_mock.csv" className="text-indigo-400 hover:text-indigo-300 underline">Jira</a>,{' '}
+              <a href="/mock_data/transcript_mock.txt" download="transcript_mock.txt" className="text-indigo-400 hover:text-indigo-300 underline">Transcript</a>{' '}
+              mock files
             </p>
 
             {uploadError && (
@@ -266,33 +349,57 @@ export default function Home() {
               className="mt-6 w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
               {uploading ? (
-                <><Loader2 size={18} className="animate-spin" /> Indexing your data…</>
+                <><Loader2 size={18} className="animate-spin" /> Indexing your data...</>
               ) : (
                 <><Zap size={18} /> Analyse My Data</>
               )}
             </button>
-              <p className="text-center text-gray-500 text-xs mt-2">First load may take 30 seconds while the server wakes up.</p>
-              {uploading && (
+            <p className="text-center text-gray-500 text-xs mt-2">First load may take 30 seconds while the server wakes up.</p>
+            {uploading && (
               <p className="text-center text-gray-500 text-sm mt-3">
-                Embedding and indexing ” this takes 20-60 seconds depending on file size
+                Embedding and indexing - this takes 20-60 seconds depending on file size
               </p>
             )}
           </div>
         )}
 
-        {/* â”€â”€ QUERY STEP â”€â”€ */}
+        {/* QUERY STEP */}
         {step === 'query' && (
           <div>
             {/* Upload summary */}
             <div className="bg-[#141720] border border-[#2a2d3d] rounded-xl p-4 mb-8 flex flex-wrap gap-3 items-center">
               <CheckCircle size={16} className="text-emerald-400 shrink-0" />
-              <span className="text-sm text-gray-300 font-medium">Data indexed ”</span>
+              <span className="text-sm text-gray-300 font-medium">Data indexed</span>
               {uploadResults.map((r, i) => (
                 <span key={i} className="text-xs bg-[#1e2130] border border-[#2a2d3d] rounded-full px-3 py-1 text-gray-400">
                   {r.file} <span className="text-indigo-400">{r.chunks} chunks</span>
                 </span>
               ))}
             </div>
+
+            {/* Insight Panel */}
+            {insightsLoading && (
+              <div className="mb-8 bg-[#141720] border border-[#2a2d3d] rounded-xl p-6 flex items-center gap-3 text-gray-400">
+                <Loader2 size={16} className="animate-spin text-indigo-400 shrink-0" />
+                <span className="text-sm">Analysing your data and surfacing top issues...</span>
+              </div>
+            )}
+
+            {!insightsLoading && insights.length > 0 && (
+              <div className="mb-8">
+                <div className="flex items-center gap-2 mb-4">
+                  <Zap size={14} className="text-indigo-400" />
+                  <h2 className="text-sm font-semibold text-indigo-400 uppercase tracking-wide">Top Issues This Period</h2>
+                  <span className="text-xs text-gray-600 ml-1">auto-detected from your data</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {insights.map((cluster, i) => (
+                    <ClusterCard key={i} cluster={cluster} />
+                  ))}
+                </div>
+                <div className="mt-3 h-px bg-[#2a2d3d]" />
+              </div>
+            )}
 
             {/* Query input */}
             <div className="mb-8">
@@ -315,7 +422,8 @@ export default function Home() {
                 >
                   {querying ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
                   Ask
-                </button></div>
+                </button>
+              </div>
 
               {/* Sample queries */}
               <div className="mt-3 flex flex-wrap gap-2">
@@ -326,7 +434,8 @@ export default function Home() {
                     className="text-xs text-gray-400 hover:text-indigo-300 bg-[#141720] border border-[#2a2d3d] hover:border-indigo-800/50 rounded-full px-3 py-1.5 transition-colors"
                   >
                     {q}
-                  </button>))}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -334,7 +443,7 @@ export default function Home() {
             {querying && (
               <div className="flex items-center gap-3 text-gray-400 py-8 justify-center">
                 <Loader2 size={20} className="animate-spin text-indigo-400" />
-                <span>Searching your data and generating answer…</span>
+                <span>Searching your data and generating answer...</span>
               </div>
             )}
 
@@ -348,7 +457,6 @@ export default function Home() {
             {/* Result */}
             {result && !querying && (
               <div className="space-y-6">
-                {/* Answer */}
                 <div className="bg-[#141720] border border-[#2a2d3d] rounded-xl p-6">
                   <div className="flex items-center gap-2 mb-4">
                     <Zap size={14} className="text-indigo-400" />
@@ -359,7 +467,6 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Sources */}
                 <div>
                   <button
                     onClick={() => setShowSources(!showSources)}
@@ -367,7 +474,8 @@ export default function Home() {
                   >
                     {showSources ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                     Source chunks ({result.sources.length})
-                  </button>{showSources && (
+                  </button>
+                  {showSources && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {result.sources.map((source, i) => (
                         <SourceCard key={i} source={source} index={i} />
@@ -388,12 +496,3 @@ export default function Home() {
     </div>
   )
 }
-
-
-
-
-
-
-
-
-

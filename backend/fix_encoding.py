@@ -1,0 +1,8 @@
+﻿content = open('main.py', 'rb').read()
+content = content.replace(b'\xe2\x94\x80', b'-')
+content = content.replace(b'\xe2\x80\x93', b'-')
+content = content.replace(b'\xe2\x80\x94', b'-')
+content = content.replace(b'\xc2\xa0', b' ')
+content = content.replace(b'\xc3\xa2', b'')
+open('main.py', 'wb').write(content)
+print('done')

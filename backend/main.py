@@ -12,11 +12,12 @@ from parsers.slack_parser import parse_slack
 from parsers.jira_parser import parse_jira
 from parsers.transcript_parser import parse_transcript
 from vector_store import store_chunks, query_index
+from cluster import run_clustering
 from llm import generate_answer
 
 app = FastAPI(title="PM Signal API", version="1.0.0")
 
-# CORS â€” allow Next.js frontend
+# CORS €” allow Next.js frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # tighten in production
@@ -26,14 +27,14 @@ app.add_middleware(
 )
 
 
-# â”€â”€ Health check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ”€”€ Health check ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
 
-# â”€â”€ Ingest endpoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ”€”€ Ingest endpoint ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 
 @app.post("/ingest")
 async def ingest(
@@ -85,7 +86,7 @@ async def ingest(
     }
 
 
-# â”€â”€ Query endpoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ”€”€ Query endpoint ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 
 class QueryRequest(BaseModel):
     query: str
@@ -113,4 +114,27 @@ async def query(req: QueryRequest):
         "query": req.query,
     }
 
+# -- Insights endpoint -------------------------------------------------------
 
+class InsightsRequest(BaseModel):
+    session_id: str
+    n_clusters: int = 5
+
+
+@app.post("/insights")
+async def insights(req: InsightsRequest):
+    """
+    Run embedding-based clustering on all stored chunks for a session.
+    Returns top N ranked issue clusters with names, counts, and source breakdown.
+    """
+    if not req.session_id:
+        raise HTTPException(status_code=400, detail="session_id is required.")
+    try:
+        clusters = run_clustering(req.session_id, n_clusters=req.n_clusters)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Clustering failed: {str(e)}")
+    return {
+        "session_id": req.session_id,
+        "clusters": clusters,
+        "total_clusters": len(clusters),
+    }
