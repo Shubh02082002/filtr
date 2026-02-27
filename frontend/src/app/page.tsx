@@ -328,7 +328,7 @@ export default function Home() {
     setFillPct(0)
     setQueriesUsed(0)
     setCapReached(false)
-    startCountdown(60)
+    startCountdown(90)
     setStep('loading')
     setInsights([])
     crawlFill(28)
@@ -342,7 +342,7 @@ export default function Home() {
 
       setCurrentStage('indexed')
       setFillPct(33)
-      startCountdown(90)
+      startCountdown(60)
       crawlFill(58)
 
       const res = await fetch(`${API_BASE}/ingest`, { method: 'POST', body: formData })
@@ -356,7 +356,7 @@ export default function Home() {
 
       setCurrentStage('clustering')
       setFillPct(66)//TODO: Fix this later
-      startCountdown(60)
+      startCountdown(30)
       crawlFill(88)
 
       const sid = data.session_id
