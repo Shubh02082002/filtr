@@ -1,8 +1,22 @@
+# Python
 backend/venv/
 backend/__pycache__/
-backend/.env
+*.pyc
+
+# Node / Next
 frontend/node_modules/
 frontend/.next/
-*.pyc
+
+# OS
 .DS_Store
-frontend/.env.local
+
+# Environment files (global)
+.env
+.env.*
+
+# Backend env
+backend/.env
+backend/.env.*
+
+# Frontend env
+frontend/.env*
