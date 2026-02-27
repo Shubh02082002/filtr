@@ -13,7 +13,7 @@ from parsers.jira_parser import parse_jira
 from parsers.transcript_parser import parse_transcript
 from vector_store import store_chunks, query_index
 from cluster import run_clustering
-from llm import generate_answer
+from llm import get_answer
 from key_pool import key_pool, NoAvailableKeyError
 
 # ── Register key pools ───────────────────────────────────────────────────────
@@ -99,7 +99,7 @@ async def ingest(
 class QueryRequest(BaseModel):
     query: str
     session_id: str
-    top_k: int = 8
+    top_k: int = 12
 
 
 @app.post("/query")
@@ -118,7 +118,7 @@ async def query(req: QueryRequest):
     # NoAvailableKeyError handler
     try:
         chunks = query_index(req.query, session_id=req.session_id, top_k=req.top_k)
-        answer = generate_answer(req.query, chunks)
+        answer = get_answer(req.query, chunks)
     except NoAvailableKeyError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
@@ -135,7 +135,7 @@ async def query(req: QueryRequest):
 # ── Insights ─────────────────────────────────────────────────────────────────
 class InsightsRequest(BaseModel):
     session_id: str
-    n_clusters: int = 5
+    #n_clusters: int = 5
 
 
 @app.post("/insights")
@@ -143,7 +143,7 @@ async def insights(req: InsightsRequest):
     if not req.session_id:
         raise HTTPException(status_code=400, detail="session_id is required.")
     try:
-        clusters = run_clustering(req.session_id, n_clusters=req.n_clusters)
+        clusters = run_clustering(req.session_id)
     except NoAvailableKeyError as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
