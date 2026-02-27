@@ -342,7 +342,7 @@ export default function Home() {
 
       setCurrentStage('indexed')
       setFillPct(33)
-      startCountdown(40)
+      startCountdown(90)
       crawlFill(58)
 
       const res = await fetch(`${API_BASE}/ingest`, { method: 'POST', body: formData })
@@ -355,8 +355,8 @@ export default function Home() {
       setUploadResults(data.files)
 
       setCurrentStage('clustering')
-      setFillPct(66)
-      startCountdown(25)
+      setFillPct(66)//TODO: Fix this later
+      startCountdown(60)
       crawlFill(88)
 
       const sid = data.session_id
@@ -582,12 +582,14 @@ export default function Home() {
               })}
             </div>
             <p className="text-center text-sm text-gray-600 mb-6">
-              {STAGE_STATUS_LINES[currentStage](totalChunks)}
+              {countdown <= 1
+                ? 'Still working — server is under load, please wait...'
+                : STAGE_STATUS_LINES[currentStage](totalChunks)}
             </p>
-            {currentStage === 'uploaded' && (
+            {true && (
               <div className="mx-auto max-w-sm bg-[#141720] border border-[#2a2d3d] rounded-lg px-4 py-3 text-center">
                 <p className="text-xs text-amber-500/80 leading-relaxed">
-                  ⏳ <span className="font-medium">First load takes 30–60s</span> — our server sleeps when idle and needs a moment to wake up. Subsequent sessions will be significantly faster.
+                  ⏳ <span className="font-medium">First load takes 60–120s</span> — our server sleeps when idle and needs a moment to wake up. Subsequent sessions will be significantly faster.
                 </p>
               </div>
             )}
