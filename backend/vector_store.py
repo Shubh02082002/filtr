@@ -4,64 +4,62 @@ import time
 import requests
 from typing import List, Dict
 from pinecone import Pinecone
+from key_pool import key_pool, NoAvailableKeyError
 
 # Initialize Pinecone
 pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
-
-GEMINI_API_KEY = None
-
-def get_api_key():
-    global GEMINI_API_KEY
-    if GEMINI_API_KEY is None:
-        GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
-    return GEMINI_API_KEY
 
 def get_index():
     index_name = os.environ.get("PINECONE_INDEX_NAME", "pmsignal")
     return pc.Index(index_name)
 
 def embed_single(text: str, task_type: str = "retrieval_document") -> List[float]:
-    """Call Gemini embedding REST API directly. Used for single query embedding."""
-    api_key = get_api_key()
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key={api_key}"
-    payload = {
-        "model": "models/gemini-embedding-001",
-        "content": {"parts": [{"text": text}]},
-        "taskType": task_type,
-        "outputDimensionality": 768
-    }
-    response = requests.post(url, json=payload)
-    response.raise_for_status()
-    return response.json()["embedding"]["values"]
-
-def embed_texts(texts: List[str]) -> List[List[float]]:
-    """
-    Batch embed all texts in a single API call using batchEmbedContents.
-    Reduces 30 sequential calls to 1 — cuts upload time from ~3 mins to ~10s.
-    """
-    api_key = get_api_key()
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:batchEmbedContents?key={api_key}"
-    reqs = [
-        {
+    """Single embedding call with key pool rotation."""
+    for attempt in range(4):
+        key = key_pool.get_key("gemini")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key={key}"
+        payload = {
             "model": "models/gemini-embedding-001",
-            "content": {"parts": [{"text": t}]},
-            "taskType": "retrieval_document",
+            "content": {"parts": [{"text": text}]},
+            "taskType": task_type,
             "outputDimensionality": 768
         }
-        for t in texts
-    ]
-    response = requests.post(url, json={"requests": reqs})
-    response.raise_for_status()
-    return [e["values"] for e in response.json()["embeddings"]]
+        response = requests.post(url, json=payload)
+        if response.status_code == 429:
+            key_pool.mark_429("gemini", key)
+            continue
+        response.raise_for_status()
+        return response.json()["embedding"]["values"]
+    raise NoAvailableKeyError("All Gemini keys are cooling down. Try in 60s.")
+
+def embed_texts(texts: List[str]) -> List[List[float]]:
+    """Batch embed all texts in a single API call with key pool rotation."""
+    for attempt in range(4):
+        key = key_pool.get_key("gemini")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:batchEmbedContents?key={key}"
+        reqs = [
+            {
+                "model": "models/gemini-embedding-001",
+                "content": {"parts": [{"text": t}]},
+                "taskType": "retrieval_document",
+                "outputDimensionality": 768
+            }
+            for t in texts
+        ]
+        response = requests.post(url, json={"requests": reqs})
+        if response.status_code == 429:
+            key_pool.mark_429("gemini", key)
+            continue
+        response.raise_for_status()
+        return [e["values"] for e in response.json()["embeddings"]]
+    raise NoAvailableKeyError("All Gemini keys are cooling down. Try in 60s.")
 
 def embed_query(query: str) -> List[float]:
     """Embed a single query string."""
     return embed_single(query, task_type="retrieval_query")
 
 def store_chunks(chunks: List[Dict], source_file: str, session_id: str):
-    """
-    Embed and upsert chunks into Pinecone with metadata.
-    """
+    """Embed and upsert chunks into Pinecone with metadata."""
     index = get_index()
     texts = [c["text"] for c in chunks]
     embeddings = embed_texts(texts)
@@ -81,16 +79,13 @@ def store_chunks(chunks: List[Dict], source_file: str, session_id: str):
                 "issue_type": chunk.get("issue_type") or "",
             }
         })
-    # Upsert in batches of 100
     batch_size = 100
     for i in range(0, len(vectors), batch_size):
         index.upsert(vectors=vectors[i:i + batch_size])
     return len(vectors)
 
 def query_index(query: str, session_id: str, top_k: int = 8) -> List[Dict]:
-    """
-    Embed query and retrieve top-K chunks from Pinecone filtered by session.
-    """
+    """Embed query and retrieve top-K chunks from Pinecone filtered by session."""
     index = get_index()
     query_vector = embed_query(query)
     results = index.query(
@@ -112,7 +107,6 @@ def query_index(query: str, session_id: str, top_k: int = 8) -> List[Dict]:
             "issue_type": meta.get("issue_type", ""),
         })
     return chunks
-
 
 def fetch_session_vectors(session_id: str):
     index = get_index()

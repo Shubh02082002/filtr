@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Upload, Search, FileText, MessageSquare, Layers, ChevronDown, ChevronUp, Loader2, CheckCircle, AlertCircle, X, Zap, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { Upload, Search, FileText, MessageSquare, Layers, ChevronDown, ChevronUp, Loader2, CheckCircle, AlertCircle, X, Zap, ThumbsUp, ThumbsDown, Info } from 'lucide-react'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const FEEDBACK_FORM_URL = 'https://forms.gle/W3UCpN3GWmEWJFbz8'
+const QUERY_CAP = 4
 
 type SourceType = 'slack' | 'jira' | 'transcript'
 
@@ -22,6 +23,7 @@ interface QueryResult {
   answer: string
   sources: Source[]
   query: string
+  queries_remaining?: number
 }
 
 interface FileResult {
@@ -87,49 +89,76 @@ function SourceCard({ source }: { source: Source }) {
   )
 }
 
-function ClusterCard({ cluster }: { cluster: Cluster }) {
+// ── Compact Cluster Tab (replaces full ClusterCard) ──
+function ClusterTab({ cluster }: { cluster: Cluster }) {
   const [vote, setVote] = useState<'up' | 'down' | null>(null)
+  const total = cluster.sources.slack + cluster.sources.jira + cluster.sources.transcript
 
   return (
-    <div className="bg-[#141720] border border-[#2a2d3d] rounded-xl p-4 hover:border-[#3a3f55] transition-colors">
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <span className="font-semibold text-slate-100 text-sm leading-snug">{cluster.name}</span>
-        <span className="text-xs text-slate-400 bg-[#1e2130] px-2 py-1 rounded-full shrink-0 border border-[#2a2d3d]">
-          {cluster.count} mentions
-        </span>
+    <div className="flex items-center justify-between bg-[#141720] border border-[#2a2d3d] rounded-lg px-3 py-2 hover:border-[#3a3f55] transition-colors gap-3">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="text-xs font-medium text-slate-200 truncate">{cluster.name}</span>
+        <span className="text-xs text-slate-500 shrink-0">{cluster.count} mentions</span>
+        <div className="flex gap-1 shrink-0">
+          {cluster.sources.slack > 0 && (
+            <span className="text-xs bg-purple-900/40 text-purple-300 border border-purple-700/50 px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">
+              <MessageSquare size={9} /> {cluster.sources.slack}
+            </span>
+          )}
+          {cluster.sources.jira > 0 && (
+            <span className="text-xs bg-blue-900/40 text-blue-300 border border-blue-700/50 px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">
+              <Layers size={9} /> {cluster.sources.jira}
+            </span>
+          )}
+          {cluster.sources.transcript > 0 && (
+            <span className="text-xs bg-emerald-900/40 text-emerald-300 border border-emerald-700/50 px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">
+              <FileText size={9} /> {cluster.sources.transcript}
+            </span>
+          )}
+        </div>
       </div>
-      <div className="flex gap-2 flex-wrap mb-3">
-        {cluster.sources.slack > 0 && (
-          <span className="text-xs bg-purple-900/40 text-purple-300 border border-purple-700/50 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-            <MessageSquare size={10} /> Slack {cluster.sources.slack}
-          </span>
-        )}
-        {cluster.sources.jira > 0 && (
-          <span className="text-xs bg-blue-900/40 text-blue-300 border border-blue-700/50 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-            <Layers size={10} /> Jira {cluster.sources.jira}
-          </span>
-        )}
-        {cluster.sources.transcript > 0 && (
-          <span className="text-xs bg-emerald-900/40 text-emerald-300 border border-emerald-700/50 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-            <FileText size={10} /> Transcript {cluster.sources.transcript}
-          </span>
-        )}
+      <div className="flex gap-1 shrink-0">
+        <button
+          onClick={() => setVote('up')}
+          className={`p-1 rounded transition-colors ${vote === 'up' ? 'text-emerald-400' : 'text-gray-600 hover:text-emerald-400'}`}
+        >
+          <ThumbsUp size={11} />
+        </button>
+        <button
+          onClick={() => setVote('down')}
+          className={`p-1 rounded transition-colors ${vote === 'down' ? 'text-red-400' : 'text-gray-600 hover:text-red-400'}`}
+        >
+          <ThumbsDown size={11} />
+        </button>
       </div>
-      <div className="flex items-center justify-between pt-2 border-t border-[#2a2d3d]">
-        <span className="text-xs text-gray-600">Was this cluster useful?</span>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setVote('up')}
-            className={`p-1.5 rounded-lg transition-colors ${vote === 'up' ? 'bg-emerald-900/50 text-emerald-400' : 'text-gray-600 hover:text-emerald-400 hover:bg-emerald-900/20'}`}
-          >
-            <ThumbsUp size={13} />
-          </button>
-          <button
-            onClick={() => setVote('down')}
-            className={`p-1.5 rounded-lg transition-colors ${vote === 'down' ? 'bg-red-900/50 text-red-400' : 'text-gray-600 hover:text-red-400 hover:bg-red-900/20'}`}
-          >
-            <ThumbsDown size={13} />
-          </button>
+    </div>
+  )
+}
+
+// ── Query Counter ──
+function QueryCounter({ used, cap }: { used: number; cap: number }) {
+  const remaining = cap - used
+  const pct = (used / cap) * 100
+  const color = remaining === 0 ? 'text-red-400' : remaining === 1 ? 'text-amber-400' : 'text-indigo-400'
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex gap-1">
+        {Array.from({ length: cap }).map((_, i) => (
+          <div
+            key={i}
+            className={`w-1.5 h-1.5 rounded-full transition-colors ${i < used ? 'bg-indigo-500' : 'bg-[#2a2d3d]'}`}
+          />
+        ))}
+      </div>
+      <span className={`text-xs font-medium ${color}`}>
+        {remaining === 0 ? 'No questions left' : `${remaining} of ${cap} questions remaining`}
+      </span>
+      <div className="relative group">
+        <Info size={12} className="text-gray-600 cursor-help" />
+        <div className="absolute bottom-5 right-0 w-56 bg-[#1e2130] border border-[#2a2d3d] rounded-lg p-3 text-xs text-gray-400 hidden group-hover:block z-10 shadow-xl">
+          <p className="font-medium text-gray-300 mb-1">MVP Free Tier Limit</p>
+          <p>Each session allows {cap} questions to manage API usage during beta. Upload new files to start a fresh session.</p>
         </div>
       </div>
     </div>
@@ -199,9 +228,7 @@ function MilestoneBar({ stageIndex, fillPct }: { stageIndex: number; fillPct: nu
 // ── Sticky Bottom Feedback Bar ──
 function BottomFeedbackBar() {
   const [dismissed, setDismissed] = useState(false)
-
   if (dismissed) return null
-
   return (
     <div
       className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-3 border-t border-[#2a2d3d]"
@@ -209,28 +236,15 @@ function BottomFeedbackBar() {
     >
       <span className="text-sm text-gray-400">Did Filtr save you time today?</span>
       <div className="flex items-center gap-3">
-        <a
-          href={FEEDBACK_FORM_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => setDismissed(true)}
-          className="text-sm font-medium px-4 py-1.5 rounded-lg bg-emerald-700/30 text-emerald-400 border border-emerald-700/50 hover:bg-emerald-700/50 transition-colors"
-        >
+        <a href={FEEDBACK_FORM_URL} target="_blank" rel="noopener noreferrer" onClick={() => setDismissed(true)}
+          className="text-sm font-medium px-4 py-1.5 rounded-lg bg-emerald-700/30 text-emerald-400 border border-emerald-700/50 hover:bg-emerald-700/50 transition-colors">
           Yes, it did
         </a>
-        <a
-          href={FEEDBACK_FORM_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => setDismissed(true)}
-          className="text-sm font-medium px-4 py-1.5 rounded-lg bg-[#1e2130] text-gray-400 border border-[#2a2d3d] hover:border-[#3a3f55] hover:text-gray-300 transition-colors"
-        >
+        <a href={FEEDBACK_FORM_URL} target="_blank" rel="noopener noreferrer" onClick={() => setDismissed(true)}
+          className="text-sm font-medium px-4 py-1.5 rounded-lg bg-[#1e2130] text-gray-400 border border-[#2a2d3d] hover:border-[#3a3f55] hover:text-gray-300 transition-colors">
           Not really
         </a>
-        <button
-          onClick={() => setDismissed(true)}
-          className="text-gray-600 hover:text-gray-400 transition-colors ml-1"
-        >
+        <button onClick={() => setDismissed(true)} className="text-gray-600 hover:text-gray-400 transition-colors ml-1">
           <X size={14} />
         </button>
       </div>
@@ -255,6 +269,8 @@ export default function Home() {
   const [currentStage, setCurrentStage] = useState<StageKey>('uploaded')
   const [countdown, setCountdown] = useState(60)
   const [fillPct, setFillPct] = useState(0)
+  const [queriesUsed, setQueriesUsed] = useState(0)
+  const [capReached, setCapReached] = useState(false)
 
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const fillRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -310,6 +326,8 @@ export default function Home() {
     setUploadError(null)
     setCurrentStage('uploaded')
     setFillPct(0)
+    setQueriesUsed(0)
+    setCapReached(false)
     startCountdown(60)
     setStep('loading')
     setInsights([])
@@ -377,7 +395,7 @@ export default function Home() {
 
   const handleQuery = async (q?: string) => {
     const queryText = q || query
-    if (!queryText.trim() || !sessionId) return
+    if (!queryText.trim() || !sessionId || capReached) return
     setQuerying(true)
     setQueryError(null)
     setResult(null)
@@ -391,9 +409,20 @@ export default function Home() {
       })
       if (!res.ok) {
         const err = await res.json()
+        if (err.detail?.includes('QUERY_CAP_REACHED')) {
+          setCapReached(true)
+          setQueriesUsed(QUERY_CAP)
+          return
+        }
         throw new Error(err.detail || 'Query failed')
       }
-      setResult(await res.json())
+      const data = await res.json()
+      setResult(data)
+      setQueriesUsed(prev => {
+        const next = prev + 1
+        if (next >= QUERY_CAP) setCapReached(true)
+        return next
+      })
     } catch (err: any) {
       setQueryError(err.message)
     } finally {
@@ -419,13 +448,8 @@ export default function Home() {
 
           {step === 'query' && (
             <div className="flex items-center gap-3">
-              {/* Share Feedback pill — clean, no long text */}
-              <a
-                href={FEEDBACK_FORM_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs font-medium px-3 py-1.5 rounded-full border border-indigo-700/60 text-indigo-400 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all"
-              >
+              <a href={FEEDBACK_FORM_URL} target="_blank" rel="noopener noreferrer"
+                className="text-xs font-medium px-3 py-1.5 rounded-full border border-indigo-700/60 text-indigo-400 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all">
                 Share Feedback
               </a>
               <button
@@ -436,6 +460,8 @@ export default function Home() {
                   setResult(null)
                   setSessionId(null)
                   setInsights([])
+                  setQueriesUsed(0)
+                  setCapReached(false)
                   stopCountdown()
                 }}
                 className="text-sm text-gray-400 hover:text-white transition-colors"
@@ -534,36 +560,37 @@ export default function Home() {
               <p className="text-xs text-gray-600 uppercase tracking-widest mb-4">Analysing Your Data</p>
               <p className="text-3xl font-light text-white tabular-nums">~{countdown}s remaining</p>
             </div>
-
             <div className="mb-3 px-1">
               <MilestoneBar stageIndex={stageIndex} fillPct={fillPct} />
             </div>
-
             <div className="relative mb-10" style={{ height: '20px' }}>
               {STAGES.map((s, i) => {
                 const isComplete = i < stageIndex
                 const isActive = i === stageIndex
                 const pos = MILESTONE_POSITIONS[i]
                 return (
-                  <span
-                    key={s.key}
-                    className="absolute text-xs uppercase tracking-wide transition-colors duration-500"
+                  <span key={s.key} className="absolute text-xs uppercase tracking-wide transition-colors duration-500"
                     style={{
                       left: `${pos}%`,
                       transform: i === 0 ? 'translateX(0)' : i === STAGES.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)',
                       color: isComplete ? '#6366f1' : isActive ? '#ffffff' : '#374151',
                       fontWeight: isActive ? '600' : '400',
-                    }}
-                  >
+                    }}>
                     {s.label}
                   </span>
                 )
               })}
             </div>
-
-            <p className="text-center text-sm text-gray-600">
+            <p className="text-center text-sm text-gray-600 mb-6">
               {STAGE_STATUS_LINES[currentStage](totalChunks)}
             </p>
+            {currentStage === 'uploaded' && (
+              <div className="mx-auto max-w-sm bg-[#141720] border border-[#2a2d3d] rounded-lg px-4 py-3 text-center">
+                <p className="text-xs text-amber-500/80 leading-relaxed">
+                  ⏳ <span className="font-medium">First load takes 30–60s</span> — our server sleeps when idle and needs a moment to wake up. Subsequent sessions will be significantly faster.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -571,7 +598,7 @@ export default function Home() {
         {step === 'query' && (
           <div>
             {/* Upload summary */}
-            <div className="bg-[#141720] border border-[#2a2d3d] rounded-xl p-4 mb-8 flex flex-wrap gap-3 items-center">
+            <div className="bg-[#141720] border border-[#2a2d3d] rounded-xl p-4 mb-6 flex flex-wrap gap-3 items-center">
               <CheckCircle size={16} className="text-emerald-400 shrink-0" />
               <span className="text-sm text-gray-300 font-medium">Data indexed</span>
               {uploadResults.map((r, i) => (
@@ -581,26 +608,30 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Cluster cards — NO feedback banner above, clean */}
+            {/* Compact cluster tabs */}
             {insights.length > 0 && (
-              <div className="mb-8">
-                <div className="flex items-center gap-2 mb-4">
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
                   <Zap size={14} className="text-indigo-400" />
                   <h2 className="text-sm font-semibold text-indigo-400 uppercase tracking-wide">Top Issues This Period</h2>
                   <span className="text-xs text-gray-600 ml-1">auto-detected from your data</span>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="flex flex-col gap-1.5">
                   {insights.map((cluster, i) => (
-                    <ClusterCard key={i} cluster={cluster} />
+                    <ClusterTab key={i} cluster={cluster} />
                   ))}
                 </div>
-                <div className="mt-3 h-px bg-[#2a2d3d]" />
+                <div className="mt-4 h-px bg-[#2a2d3d]" />
               </div>
             )}
 
-            {/* Query input */}
-            <div className="mb-8">
+            {/* Query input + counter */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-gray-400">Ask a question</span>
+                <QueryCounter used={queriesUsed} cap={QUERY_CAP} />
+              </div>
+
               <div className="flex gap-3">
                 <div className="flex-1 relative">
                   <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -609,13 +640,14 @@ export default function Home() {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleQuery()}
-                    placeholder="What are the most common issues users report?"
-                    className="w-full bg-[#141720] border border-[#2a2d3d] rounded-xl pl-10 pr-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-600 transition-colors"
+                    placeholder={capReached ? 'Query limit reached — restart to continue' : 'What are the most common issues users report?'}
+                    disabled={capReached}
+                    className="w-full bg-[#141720] border border-[#2a2d3d] rounded-xl pl-10 pr-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   />
                 </div>
                 <button
                   onClick={() => handleQuery()}
-                  disabled={!query.trim() || querying}
+                  disabled={!query.trim() || querying || capReached}
                   className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium px-6 rounded-xl transition-colors flex items-center gap-2 shrink-0"
                 >
                   {querying ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
@@ -623,18 +655,32 @@ export default function Home() {
                 </button>
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                {SAMPLE_QUERIES.map((q, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleQuery(q)}
-                    className="text-xs text-gray-400 hover:text-indigo-300 bg-[#141720] border border-[#2a2d3d] hover:border-indigo-800/50 rounded-full px-3 py-1.5 transition-colors"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
+              {!capReached && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {SAMPLE_QUERIES.map((q, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleQuery(q)}
+                      disabled={capReached}
+                      className="text-xs text-gray-400 hover:text-indigo-300 bg-[#141720] border border-[#2a2d3d] hover:border-indigo-800/50 rounded-full px-3 py-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+
+            {/* Cap reached banner */}
+            {capReached && (
+              <div className="flex items-start gap-3 bg-amber-900/20 border border-amber-800/50 rounded-xl px-4 py-4 mb-6">
+                <AlertCircle size={16} className="text-amber-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-400 mb-1">You've used all {QUERY_CAP} free questions</p>
+                  <p className="text-xs text-amber-600">This limit exists during the MVP beta to manage API usage. Click "Back to upload" to start a fresh session with new files.</p>
+                </div>
+              </div>
+            )}
 
             {querying && (
               <div className="flex items-center gap-3 text-gray-400 py-8 justify-center">
@@ -644,8 +690,15 @@ export default function Home() {
             )}
 
             {queryError && (
-              <div className="flex items-center gap-2 bg-red-900/20 border border-red-800/50 rounded-lg px-4 py-3 text-red-400 text-sm">
-                <AlertCircle size={16} /> {queryError}
+              <div className={`flex items-center gap-2 rounded-lg px-4 py-3 text-sm mb-4 ${
+                queryError.includes('cooling down')
+                  ? 'bg-blue-900/20 border border-blue-800/50 text-blue-400'
+                  : 'bg-red-900/20 border border-red-800/50 text-red-400'
+              }`}>
+                <AlertCircle size={16} />
+                {queryError.includes('cooling down')
+                  ? '⏳ System is busy — all API keys are cooling down. Wait 60 seconds and try again.'
+                  : queryError}
               </div>
             )}
 
@@ -685,10 +738,9 @@ export default function Home() {
       </main>
 
       <footer className="border-t border-[#1e2130] mt-20 py-6 text-center text-xs text-gray-700">
-        Filtr · Files processed in-memory and not stored after indexing · Built with Gemini + Pinecone
+        Filtr · Files processed in-memory and not stored after indexing · Built with Gemini + GroQ + Pinecone
       </footer>
 
-      {/* Sticky bottom feedback bar — only on query step */}
       {step === 'query' && <BottomFeedbackBar />}
 
     </div>

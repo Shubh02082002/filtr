@@ -14,37 +14,46 @@ from parsers.transcript_parser import parse_transcript
 from vector_store import store_chunks, query_index
 from cluster import run_clustering
 from llm import generate_answer
+from key_pool import key_pool, NoAvailableKeyError
+
+# ── Register key pools ───────────────────────────────────────────────────────
+gemini_keys = [v for k, v in os.environ.items() if k.startswith("GEMINI_KEY_") and v]
+groq_keys   = [v for k, v in os.environ.items() if k.startswith("GROQ_KEY_") and v]
+
+key_pool.register("gemini", gemini_keys)
+key_pool.register("groq",   groq_keys)
+
+# ── Per-session query cap (in-memory) ────────────────────────────────────────
+QUERY_CAP = 4
+query_counts: dict[str, int] = {}
 
 app = FastAPI(title="PM Signal API", version="1.0.0")
 
-# CORS €” allow Next.js frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# ”€”€ Health check ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
-
+# ── Health ───────────────────────────────────────────────────────────────────
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "gemini_pool": key_pool.status("gemini"),
+        "groq_pool":   key_pool.status("groq"),
+    }
 
 
-# ”€”€ Ingest endpoint ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
-
+# ── Ingest ───────────────────────────────────────────────────────────────────
 @app.post("/ingest")
 async def ingest(
     files: List[UploadFile] = File(...),
     session_id: Optional[str] = Form(None),
 ):
-    """
-    Accept one or more uploaded files, parse them, embed, and store in Pinecone.
-    Returns a session_id the frontend stores to scope future queries.
-    """
     if not session_id:
         session_id = uuid.uuid4().hex
 
@@ -55,11 +64,9 @@ async def ingest(
         filename = upload.filename
         content = await upload.read()
 
-        # Guard: 10MB per file
         if len(content) > 10 * 1024 * 1024:
             raise HTTPException(status_code=400, detail=f"{filename} exceeds 10MB limit.")
 
-        # Route to correct parser
         ext = filename.lower().split(".")[-1]
         if ext == "json":
             chunks = parse_slack(content)
@@ -74,10 +81,12 @@ async def ingest(
             file_results.append({"file": filename, "chunks": 0, "warning": "No parseable content found."})
             continue
 
-        # Embed + store
         count = store_chunks(chunks, source_file=filename, session_id=session_id)
         total_chunks += count
         file_results.append({"file": filename, "chunks": count})
+
+    # Initialise query counter for this session
+    query_counts[session_id] = 0
 
     return {
         "session_id": session_id,
@@ -86,8 +95,7 @@ async def ingest(
     }
 
 
-# ”€”€ Query endpoint ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
-
+# ── Query ────────────────────────────────────────────────────────────────────
 class QueryRequest(BaseModel):
     query: str
     session_id: str
@@ -96,26 +104,35 @@ class QueryRequest(BaseModel):
 
 @app.post("/query")
 async def query(req: QueryRequest):
-    """
-    Semantic search over indexed chunks, then generate an LLM answer.
-    """
     if not req.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty.")
 
-    # Retrieve relevant chunks
-    chunks = query_index(req.query, session_id=req.session_id, top_k=req.top_k)
+    # Query cap check
+    count = query_counts.get(req.session_id, 0)
+    if count >= QUERY_CAP:
+        raise HTTPException(
+            status_code=429,
+            detail=f"QUERY_CAP_REACHED: You've used all {QUERY_CAP} free questions for this session. Restart to ask more."
+        )
 
-    # Generate answer from LLM
-    answer = generate_answer(req.query, chunks)
+    # NoAvailableKeyError handler
+    try:
+        chunks = query_index(req.query, session_id=req.session_id, top_k=req.top_k)
+        answer = generate_answer(req.query, chunks)
+    except NoAvailableKeyError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    query_counts[req.session_id] = count + 1
 
     return {
         "answer": answer,
         "sources": chunks,
         "query": req.query,
+        "queries_remaining": QUERY_CAP - (count + 1),
     }
 
-# -- Insights endpoint -------------------------------------------------------
 
+# ── Insights ─────────────────────────────────────────────────────────────────
 class InsightsRequest(BaseModel):
     session_id: str
     n_clusters: int = 5
@@ -123,16 +140,15 @@ class InsightsRequest(BaseModel):
 
 @app.post("/insights")
 async def insights(req: InsightsRequest):
-    """
-    Run embedding-based clustering on all stored chunks for a session.
-    Returns top N ranked issue clusters with names, counts, and source breakdown.
-    """
     if not req.session_id:
         raise HTTPException(status_code=400, detail="session_id is required.")
     try:
         clusters = run_clustering(req.session_id, n_clusters=req.n_clusters)
+    except NoAvailableKeyError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Clustering failed: {str(e)}")
+
     return {
         "session_id": req.session_id,
         "clusters": clusters,
