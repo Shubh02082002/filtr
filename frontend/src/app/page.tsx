@@ -328,7 +328,7 @@ export default function Home() {
     setFillPct(0)
     setQueriesUsed(0)
     setCapReached(false)
-    startCountdown(90)
+    startCountdown(100)
     setStep('loading')
     setInsights([])
     crawlFill(28)
