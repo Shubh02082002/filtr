@@ -589,7 +589,7 @@ export default function Home() {
             {true && (
               <div className="mx-auto max-w-sm bg-[#141720] border border-[#2a2d3d] rounded-lg px-4 py-3 text-center">
                 <p className="text-xs text-amber-500/80 leading-relaxed">
-                  ⏳ <span className="font-medium">First load takes 60–120s</span> — our server sleeps when idle and needs a moment to wake up. Subsequent sessions will be significantly faster.
+                  ⏳ <span className="font-medium">First load takes 1-2 minutes</span> — our server sleeps when idle and needs a moment to wake up. Subsequent sessions will be significantly faster.
                 </p>
               </div>
             )}
