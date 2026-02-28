@@ -45,6 +45,7 @@ def health():
         "status": "ok",
         "gemini_pool": key_pool.status("gemini"),
         "groq_pool":   key_pool.status("groq"),
+        "cohere":      "available" if os.environ.get("COHERE_API_KEY") else "missing",
     }
 
 
@@ -135,7 +136,6 @@ async def query(req: QueryRequest):
 # ── Insights ─────────────────────────────────────────────────────────────────
 class InsightsRequest(BaseModel):
     session_id: str
-    #n_clusters: int = 5
 
 
 @app.post("/insights")
@@ -154,6 +154,7 @@ async def insights(req: InsightsRequest):
         "clusters": clusters,
         "total_clusters": len(clusters),
     }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=10000)

@@ -1,9 +1,8 @@
 import os
-import re
-import json
 import requests
 from typing import List, Dict
 from key_pool import key_pool, NoAvailableKeyError
+from reranker import rerank_chunks
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
 
@@ -21,90 +20,15 @@ HARD RULES — NO EXCEPTIONS:
 
 VIOLATION CHECK: Before responding, ask yourself — "Is every sentence I am writing directly supported by a specific chunk?" If no, remove it."""
 
-RERANK_SYSTEM_PROMPT = """You are a relevance scoring engine. You will be given a query and a list of text chunks.
-Score each chunk from 0-10 based on how directly it answers the query.
-- 10: Directly and completely answers the query
-- 7-9: Highly relevant, contains key information
-- 4-6: Partially relevant, tangentially related
-- 1-3: Minimally relevant
-- 0: Completely irrelevant
-
-Return ONLY a JSON array. No explanation. No markdown. No preamble.
-Format: [{"chunk_id": 1, "score": 8}, {"chunk_id": 2, "score": 3}, ...]"""
-
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = "llama-3.3-70b-versatile"
-
-# ── Private: Re-ranker ────────────────────────────────────────────────────────
-
-def _rerank_chunks(query: str, chunks: List[Dict], top_n: int = 5) -> List[Dict]:
-    """
-    Re-rank retrieved chunks by relevance to query using GroQ.
-    Falls back to cosine order (top_n) if JSON parse fails.
-    """
-    if len(chunks) <= top_n:
-        return chunks
-
-    # Build chunk list for scoring
-    chunk_descriptions = []
-    for i, chunk in enumerate(chunks, 1):
-        chunk_descriptions.append(f'[CHUNK {i}]: "{chunk["text"][:200]}"')
-
-    rerank_prompt = f"""Query: "{query}"
-
-Chunks to score:
-{chr(10).join(chunk_descriptions)}
-
-Return JSON array of scores for all {len(chunks)} chunks."""
-
-    payload = {
-        "model": GROQ_MODEL,
-        "messages": [
-            {"role": "system", "content": RERANK_SYSTEM_PROMPT},
-            {"role": "user", "content": rerank_prompt}
-        ],
-        "temperature": 0.0,
-        "max_tokens": 512,
-    }
-
-    for attempt in range(3):
-        try:
-            key = key_pool.get_key("groq")
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {key}"
-            }
-            response = requests.post(GROQ_URL, json=payload, headers=headers, timeout=30)
-
-            if response.status_code == 429:
-                key_pool.mark_429("groq", key)
-                continue
-
-            response.raise_for_status()
-            raw = response.json()["choices"][0]["message"]["content"].strip()
-
-            # Strip markdown fences if present
-            raw = re.sub(r"```json|```", "", raw).strip()
-            scores = json.loads(raw)
-
-            # Map scores back to chunks and sort
-            score_map = {item["chunk_id"]: item["score"] for item in scores}
-            ranked = sorted(chunks, key=lambda c, i=0: score_map.get(
-                chunks.index(c) + 1, 0), reverse=True)
-            return ranked[:top_n]
-
-        except (json.JSONDecodeError, KeyError, Exception):
-            continue
-
-    # Fallback: return top_n by original cosine order
-    return chunks[:top_n]
 
 
 # ── Private: Answer generator ─────────────────────────────────────────────────
 
 def _generate_answer(query: str, chunks: List[Dict]) -> str:
     """
-    Generate grounded answer from re-ranked chunks using GroQ.
+    Generate grounded answer from reranked chunks using GroQ.
     """
     if not chunks:
         return "No relevant context found in your uploaded files for this query. Try rephrasing or uploading more data."
@@ -165,7 +89,7 @@ Answer:"""
 def get_answer(query: str, chunks: List[Dict]) -> str:
     """
     Public function called by main.py.
-    Internally: re-ranks chunks → generates grounded answer.
+    Reranks chunks via Cohere → generates grounded answer via GroQ.
     """
-    top_chunks = _rerank_chunks(query, chunks, top_n=5)
+    top_chunks = rerank_chunks(query, chunks, top_n=5)
     return _generate_answer(query, top_chunks)

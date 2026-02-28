@@ -114,7 +114,7 @@ def store_chunks(chunks: List[Dict], source_file: str, session_id: str) -> int:
 
 # ── Retrieval ─────────────────────────────────────────────────────────────────
 
-def query_index(query: str, session_id: str, top_k: int = 12) -> List[Dict]:
+def query_index(query: str, session_id: str, top_k: int = 20) -> List[Dict]:
     """
     Embed query, retrieve top_k chunks from Pinecone, apply source weighting.
 
