@@ -449,11 +449,17 @@ export default function Home() {
       {/* ── Header — UNTOUCHED ── */}
       <header className="sticky top-0 z-10 transition-colors duration-300" style={{ borderBottom: `1px solid ${t.footerBorder}`, background: t.headerBg, backdropFilter: 'blur(16px)' }}>
         <div className="max-w-5xl mx-auto px-8 py-4 flex items-center justify-between">
-          <button onClick={goHome} className="flex items-center gap-2.5 hover:opacity-75 transition-opacity">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-900/30">
-              <Zap size={15} className="text-white" />
-            </div>
-            <span className="font-bold text-xl tracking-tight" style={{ color: t.text }}>Filtr.</span>
+          <button onClick={goHome} className="flex items-center hover:opacity-75 transition-opacity">
+            <span
+              className="font-bold text-xl tracking-tight px-3 py-1 rounded-lg"
+              style={{
+                color: t.text,
+                border: `1px solid ${t.border}`,
+                boxShadow: `0 0 12px ${t.accentText}30, inset 0 0 12px ${t.accentText}08`,
+              }}
+            >
+              Filtr.
+            </span>
           </button>
           <div className="flex items-center gap-3">
             {step === 'query' && (
